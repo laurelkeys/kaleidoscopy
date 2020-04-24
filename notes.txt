@@ -1,0 +1,11 @@
+We use global variables for simplicity [[IdentifierStr and NumVal]], but this is not the best choice for a real language implementation :).
+
+In Kaleidoscope, functions are typed with just a count of their arguments.
+Since all values are double precision floating point, the type of each argument doesn’t need to be stored anywhere.
+In a more aggressive and realistic language, the “ExprAST” class would probably have a type field.
+
+Because errors can occur, the parser needs a way to indicate that they happened: in our parser, we return null on an error.
+
+For the basic form of Kaleidoscope, we will only support 4 binary operators.
+
+To start, an expression is a primary expression potentially followed by a sequence of [binop,primaryexpr] pairs.
