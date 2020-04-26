@@ -26,7 +26,6 @@ class NumberExpr(Expr):
 
     def __init__(self, val: str):
         self.val = val
-        self._val = float(val)
 
 
 class VariableExpr(Expr):

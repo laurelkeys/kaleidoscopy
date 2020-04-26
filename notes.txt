@@ -9,3 +9,15 @@ Because errors can occur, the parser needs a way to indicate that they happened:
 For the basic form of Kaleidoscope, we will only support 4 binary operators.
 
 To start, an expression is a primary expression potentially followed by a sequence of [binop,primaryexpr] pairs.
+
+The Builder object is a helper object that makes it easy to generate LLVM instructions.
+Instances of the IRBuilder class template keep track of the current place to insert instructions and has methods to create new instructions.
+
+TheModule is an LLVM construct that contains functions and global variables.
+In many ways, it is the top-level structure that the LLVM IR uses to contain code.
+It will own the memory for all of the IR that we generate, which is why the codegen() method returns a raw Value*, rather than a unique_ptr<Value>.
+
+Code generation for function calls is quite straightforward with LLVM.
+The code above initially does a function name lookup in the LLVM Module’s symbol table.
+Recall that the LLVM Module is the container that holds the functions we are JIT’ing.
+By giving each function the same name as what the user specifies, we can use the LLVM symbol table to resolve function names for us.
