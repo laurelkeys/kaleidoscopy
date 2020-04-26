@@ -17,7 +17,9 @@ primary
 
 expression ::= primary binoprhs
 
-binoprhs ::= ('+' primary)*
+binop ::= '<' | '+' | '-' | '*'
+
+binoprhs ::= (binop primary)*
 
 prototype ::= id '(' id* ')'
 

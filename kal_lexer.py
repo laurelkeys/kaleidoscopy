@@ -1,10 +1,9 @@
 from enum import Enum
+from typing import Iterator
 from collections import namedtuple
 
 
-# The lexer returns tokens [0-255] if it is an unknown character,
-# otherwise one of these for known things.
-class Token(Enum):
+class TokenType(Enum):
     EOF = -1
 
     # commands
@@ -15,36 +14,66 @@ class Token(Enum):
     IDENTIFIER = -4
     NUMBER = -5
 
-
-IdentifierStr = None  # Filled in if Token.IDENTIFIER
-NumVal = None  # Filled in if Token.NUMBER
-
-
-def get_tok():
-    """ Return the next token from standard input. """
-    LastChar = " "
-
-    # Skip any whitespace.
-    while LastChar.isspace():
-        LastChar = getchar()
-
-    if LastChar.isalpha(): # identifier: [a-zA-Z][a-zA-Z0-9]*
-        IdentifierStr = LastChar
-        while LastChar.isalnum():
-            LastChar = getchar()
-            IdentifierStr += LastChar
-
-        if IdentifierStr == "def":
-            return Token.DEF
-        if IdentifierStr == "extern":
-            return Token.EXTERN
-        return Token.IDENTIFIER
-    
-    # FIXME
+    # unknown character
+    OPERATOR = -6
 
 
-##
+Token = namedtuple(typename="Token", field_names=["kind", "value"])
 
 
-def getchar():
-    raise NotImplementedError
+class Lexer:
+    """ Lexer for the Kaleidoscope language. """
+
+    def __init__(self, source_code: str):
+        assert len(source_code) > 0
+        self.source_code = source_code
+        self.last_char = source_code[0]
+        self.pos = 0  # index of last_char on source_code
+
+    def __get_char(self) -> str:
+        try:
+            self.pos += 1
+            return self.source_code[self.pos]
+        except IndexError:
+            return ""
+
+    def tokens(self) -> Iterator[Token]:
+        while self.last_char:
+            # Skip any whitespace
+            while self.last_char.isspace():
+                self.last_char = self.__get_char()
+
+            # Indentifier or keyword: [a-zA-Z][a-zA-Z0-9]*
+            if self.last_char.isalpha():
+                id_str = ""
+                while self.last_char.isalnum():
+                    id_str += self.last_char
+                    self.last_char = self.__get_char()
+
+                if id_str == "def":
+                    yield Token(TokenType.DEF, value=id_str)
+                if id_str == "extern":
+                    yield Token(TokenType.EXTERN, value=id_str)
+
+                yield Token(TokenType.IDENTIFIER, value=id_str)
+
+            # Number: [0-9.]+
+            elif self.last_char.isdigit() or self.last_char == ".":
+                num_str = ""
+                while self.last_char.isdigit() or self.last_char == ".":
+                    num_str += self.last_char
+                    self.last_char = self.__get_char()
+                yield Token(TokenType.NUMBER, value=float(num_str))
+
+            # Comment until end of line: #.*\n
+            elif self.last_char == "#":
+                self.last_char = self.__get_char()
+                while self.last_char and self.last_char not in "\r\n":
+                    self.last_char = self.__get_char()
+
+            # Otherwise, just return the character
+            elif self.last_char:
+                yield Token(kind=TokenType.OPERATOR, value=self.last_char)
+                self.last_char = self.__get_char()
+
+        yield Token(kind=TokenType.EOF, value="")

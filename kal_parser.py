@@ -1,216 +1,211 @@
-from typing import Dict, List, Optional
+from enum import Enum
+from typing import Dict, List, Iterator, Optional
 
 import kal_ast
 import kal_lexer
 
-# CurTok/getNextToken - Provide a simple token buffer.
-# CurTok is the current token the parser is looking at.
-# getNextToken reads another token from the lexer and updates CurTok with its results.
-CurTok = None
+from kal_lexer import Lexer, Token, TokenType
 
 
-def get_next_token():  # FIXME typing
-    CurTok = kal_lexer.get_tok()
-    return CurTok
+class Associativity(Enum):
+    NON = 0
+    LEFT = 1
+    RIGHT = 2
 
 
-# BinopPrecedence - This holds the precedence for each binary operator that is defined.
-BinopPrecedence: Dict[str, int] = {
-    # 1 is lowest precedence.
+precedence: Dict[str, int] = {
+    # lowest precedence
     "<": 10,
     "+": 20,
     "-": 20,
-    "*": 40,  # highest.
+    "*": 40,  # highest
     # ...
 }
 
-# GetTokPrecedence - Get the precedence of the pending binary operator token.
-def GetTokPrecedence() -> int:
-    if not CurTok.isascii():
-        return -1
 
-    # Make sure it's a declared binop.
-    TokPrec = BinopPrecedence[CurTok]
-    if TokPrec <= 0:
-        return -1
-    return TokPrec
+class ParseError(Exception):
+    pass
 
 
-# LogError* - These are little helper functions for error handling.
-def LogError(err_str: str) -> Optional[kal_ast.ExprAST]:
-    print(f"LogError: {err_str}\n")
-    return None
+class Parser:
+    """ Parser for the Kaleidoscope language. """
 
+    def __init__(self):
+        self.curr_tok: Token = None
+        self.tokens: Iterator[Token] = None
 
-def LogErrorP(err_str: str) -> Optional[kal_ast.PrototypeAST]:
-    LogError(err_str)
-    return None
+    def __curr_tok_precedence(self) -> int:
+        return precedence.get(self.curr_tok.value, -1)
 
+    def __curr_tok_is_operator(self, operator: str) -> bool:
+        return self.curr_tok.type == TokenType.OPERATOR and self.curr_tok.value == operator
 
-def parse_NumberExpr() -> kal_ast.ExprAST:
-    """ numberexpr ::= number """
-    assert CurTok == kal_lexer.Token.NUMBER
-    result = kal_ast.NumberExprAST(kal_lexer.NumVal)
-    get_next_token()  # consume the number
-    return result
+    def parse(self, source_code: str) -> Iterator[Optional[kal_ast.Node]]:
+        """ Returns the nodes of the AST representation of `source_code`. """
+        self.tokens = Lexer(source_code).tokens()
+        self.curr_tok = next(self.tokens)
 
+        while self.curr_tok.type != TokenType.EOF:
+            if top_level := self._parse_top_level():
+                yield top_level
 
-def parse_ParenExpr() -> kal_ast.ExprAST:
-    """ parenexpr ::= '(' expression ')' """
-    get_next_token()  # eat (.
-    v = parse_Expression()
-    if not v:
-        return None
-
-    if CurTok != ")":
-        return LogError("expected ')'")
-    get_next_token()  # eat ).
-    return v
-
-
-def parse_IdentifierExpr() -> kal_ast.ExprAST:
-    """ identifierexpr
-          ::= identifier
-          ::= identifier '(' expression* ')'
-    """
-    assert CurTok == kal_lexer.Token.IDENTIFIER
-    id_name = kal_lexer.IdentifierStr
-
-    get_next_token()  # eat identifier.
-
-    if CurTok != ")":  # Simple variable ref.
-        return kal_ast.VariableExprAST(id_name)
-
-    # Call.
-    get_next_token()
-    # eat (
-    args: List[kal_ast.ExprAST] = []
-    if CurTok != ")":
-        while True:
-            if arg := parse_Expression():
-                args.append(arg)
-            else:
-                return None
-
-            if CurTok == ")":
-                break
-
-            if CurTok != ",":
-                return LogError("Expected ')' or ',' in argument list")
-            get_next_token()
-
-    # Eat the ')'.
-    get_next_token()
-
-    return kal_ast.CallExprAST(id_name, args)
-
-
-def parse_Primary() -> Optional[kal_ast.ExprAST]:
-    """ primary
-          ::= identifierexpr
-          ::= numberexpr
-          ::= parenexpr
-    """
-    if CurTok == kal_lexer.Token.IDENTIFIER:
-        return parse_IdentifierExpr()
-
-    elif CurTok == kal_lexer.Token.NUMBER:
-        return parse_NumberExpr()
-
-    elif CurTok == "(":
-        return parse_ParenExpr()
-
-    else:
-        return LogError("unknown token when expecting an expression")
-
-
-def parse_Expression() -> Optional[kal_ast.ExprAST]:
-    """ expression ::= primary binoprhs """
-    lhs = parse_Primary()
-    if not lhs:
-        return None
-
-    return parse_BinOpRHS(0, lhs)
-
-
-def parse_BinOpRHS(expr_prec: int, lhs: kal_ast.ExprAST) -> Optional[kal_ast.ExprAST]:
-    """ binoprhs ::= ('+' primary)* """
-    # If this is a binop, find its precedence.
-    while True:
-        tok_prec = GetTokPrecedence()
-
-        # If this is a binop that binds at least as tightly as the current binop,
-        # consume it, otherwise we are done.
-        if tok_prec < expr_prec:
-            return lhs
-
-        # Okay, we know this is a binop.
-        bin_op = CurTok
-        get_next_token()  # eat binop
-
-        # Parse the primary expression after the binary operator.
-        rhs = parse_Primary()
-        if not rhs:
+    def _parse_top_level(self) -> Optional[kal_ast.Node]:
+        """ `toplevel ::= definition | external | expression | ';'` """
+        if self.__curr_tok_is_operator(";"):
+            self.curr_tok = next(self.tokens)  # ignore top-level semicolons
             return None
 
-        # If bin_op binds less tightly with RHS than the operator after RHS,
-        # let the pending operator take RHS as its LHS.
-        next_prec = GetTokPrecedence()
-        if tok_prec < next_prec:
-            rhs = parse_BinOpRHS(tok_prec + 1, rhs)  # FIXME comment the reason for +1
-            if not rhs:
-                return None
+        elif self.curr_tok.type == TokenType.DEF:
+            return self._parse_definition()
 
-        # Merge LHS/RHS.
-        lhs = kal_ast.BinaryExprAST(bin_op, lhs, rhs)
+        elif self.curr_tok.type == TokenType.EXTERN:
+            return self._parse_external()
 
+        else:
+            return self._parse_top_level_expr()
 
-def parse_Prototype() -> Optional[kal_ast.PrototypeAST]:
-    """ prototype ::= id '(' id* ')' """
-    if CurTok != kal_lexer.Token.IDENTIFIER:
-        return LogErrorP("Expected function name in prototype")
+    def _parse_number_expr(self) -> Optional[kal_ast.Expr]:
+        """ `numberexpr ::= number` """
+        result = kal_ast.NumberExpr(self.curr_tok.value)
+        self.curr_tok = next(self.tokens)  # eat number
+        return result
 
-    fn_name = kal_lexer.IdentifierStr
-    get_next_token()
+    def _parse_paren_expr(self) -> Optional[kal_ast.Expr]:
+        """ `parenexpr ::= '(' expression ')'` """
+        self.curr_tok = next(self.tokens)  # eat '('
+        expr = self._parse_expression()
+        if not expr:
+            return None
+        elif not self.__curr_tok_is_operator(")"):
+            raise ParseError("Expected ')'")
+        self.curr_tok = next(self.tokens)  # eat ')'
+        return expr
 
-    if CurTok != "(":
-        return LogErrorP("Expected '(' in prototype")
+    def _parse_identifier_expr(self) -> Optional[kal_ast.Expr]:
+        """ `identifierexpr ::= identifier |  identifier '(' expression* ')'`
+        """
+        id_name = self.curr_tok.value
+        self.curr_tok = next(self.tokens)  # eat identifier
 
-    # Read the list of argument names.
-    arg_names: List[str] = []
-    while get_next_token() == kal_lexer.Token.IDENTIFIER:
-        arg_names.append(kal_lexer.IdentifierStr)
-    if CurTok != ")":
-        return LogErrorP("Expected ')' in prototype")
+        # Simple variable ref
+        if not self.__curr_tok_is_operator("("):
+            return kal_ast.VariableExpr(id_name)
 
-    # success.
-    get_next_token()  # eat ')'.
+        # Function call
+        self.curr_tok = next(self.tokens)  # eat '('
+        args: List[kal_ast.Expr] = []
+        if not self.__curr_tok_is_operator(")"):
+            while True:
+                # args.append(self._parse_expression())
+                if arg := self._parse_expression():
+                    args.append(arg)
+                else:
+                    return None
 
-    return kal_ast.PrototypeAST(fn_name, arg_names)
+                if self.__curr_tok_is_operator(")"):
+                    break
 
+                if not self.__curr_tok_is_operator(","):
+                    raise ParseError("Expected ')' or ',' in argument list")
+                self.curr_tok = next(self.tokens)  # eat ','
 
-def parse_Definition() -> Optional[kal_ast.FunctionAST]:
-    """ definition ::= 'def' prototype expression """
-    get_next_token()  # eat def.
-    proto = parse_Prototype()
-    if not proto:
+        self.curr_tok = next(self.tokens)  # eat ')'
+        return kal_ast.CallExpr(id_name, args)
+
+    def _parse_primary(self) -> Optional[kal_ast.Expr]:
+        """ `primary ::= identifierexpr | numberexpr | parenexpr` """
+        if self.curr_tok.type == TokenType.IDENTIFIER:
+            return self._parse_identifier_expr()
+
+        elif self.curr_tok.type == TokenType.NUMBER:
+            return self._parse_number_expr()
+
+        elif self.__curr_tok_is_operator("("):
+            return self._parse_paren_expr()
+
+        else:
+            raise ParseError(
+                f"Unknown token '{self.curr_tok.value}' when expecting an expression"
+            )
+
+    def _parse_expression(self) -> Optional[kal_ast.Expr]:
+        """ `expression ::= primary binoprhs` """
+        lhs = self._parse_primary()
+        # NOTE Start with precedence 0 because we want to
+        # bind any operator to the expression at this point
+        return self._parse_bin_op_rhs(expr_prec=0, lhs=lhs)
+
+    def _parse_bin_op_rhs(self, expr_prec: int, lhs: kal_ast.Expr) -> Optional[kal_ast.Expr]:
+        """ `binoprhs ::= (binop primary)*`
+
+            Note: `expr_prec` is the minimum precedence to keep going (precedence climbing).
+        """
+        # If this is a binop, find its precedence
+        while True:
+            curr_prec = self.__curr_tok_precedence()
+
+            # If this is a binary operator that binds at least as tightly as the
+            # currently parsed sub-expression, consume it, otherwise we are done
+            if curr_prec < expr_prec:
+                # NOTE The precedence of non-operators is defined to be -1,
+                # so this condition handles cases when the expression ended
+                return lhs
+
+            # Okay, we know this is a binop
+            bin_op = self.curr_tok.value
+            self.curr_tok = next(self.tokens)  # eat binop
+
+            # Parse the primary expression after the binary operator
+            rhs = self._parse_primary()
+
+            # If bin_op binds less tightly with RHS than the operator
+            # after RHS, let the pending operator take RHS as its LHS
+            next_prec = self.__curr_tok_precedence()
+            if curr_prec < next_prec:
+                rhs = self._parse_bin_op_rhs(curr_prec + 1, rhs)
+
+            # Merge LHS/RHS
+            lhs = kal_ast.BinaryExpr(bin_op, lhs, rhs)
+
+    def _parse_prototype(self) -> Optional[kal_ast.Prototype]:
+        """ `prototype ::= id '(' id* ')'` """
+        if self.curr_tok.type != TokenType.IDENTIFIER:
+            raise ParseError("Expected function name in prototype")
+
+        fn_name = self.curr_tok.value
+        self.curr_tok = next(self.tokens)  # eat id
+
+        if not self.__curr_tok_is_operator("("):
+            raise ParseError("Expected '(' in prototype")
+        self.curr_tok = next(self.tokens)  # eat '('
+
+        # Read the list of argument names
+        params: List[str] = []
+        while self.curr_tok.type == TokenType.IDENTIFIER:
+            params.append(self.curr_tok.value)
+            self.curr_tok = next(self.tokens)  # eat id
+
+        if not self.__curr_tok_is_operator(")"):
+            raise ParseError("Expected ')' in prototype")
+        self.curr_tok = next(self.tokens)  # eat ')'
+
+        return kal_ast.Prototype(fn_name, params)
+
+    def _parse_definition(self) -> Optional[kal_ast.Function]:
+        """ `definition ::= 'def' prototype expression` """
+        self.curr_tok = next(self.tokens)  # eat 'def'
+        proto = self._parse_prototype()
+        expr = self._parse_expression()
+        return kal_ast.Function(proto, body=expr)
+
+    def _parse_external(self) -> Optional[kal_ast.Prototype]:
+        """ `external ::= 'extern' prototype` """
+        self.curr_tok = next(self.tokens)  # eat 'extern'
+        return self._parse_prototype()
+
+    def _parse_top_level_expr(self) -> Optional[kal_ast.Function]:
+        """ `toplevelexpr ::= expression` """
+        if expr := self._parse_expression():
+            # Make an anonymous function prototype
+            return kal_ast.Function(proto=kal_ast.Prototype(name="", params=[]), body=expr)
         return None
-
-    if e := parse_Expression():
-        return kal_ast.FunctionAST(proto, e)
-    return None
-
-
-def parse_Extern() -> Optional[kal_ast.PrototypeAST]:
-    """ external ::= 'extern' prototype """
-    get_next_token()  # eat extern.
-    return parse_Prototype()
-
-
-def parse_TopLevelExpr() -> Optional[kal_ast.FunctionAST]:
-    """ toplevelexpr ::= expression """
-    if e := parse_Expression():
-        # Make an anonymous proto.
-        proto = kal_ast.PrototypeAST(name="", args=[])
-        return kal_ast.FunctionAST(proto, e)
-    return None
