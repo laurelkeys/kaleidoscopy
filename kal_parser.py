@@ -66,7 +66,7 @@ class Parser:
 
     def _parse_number_expr(self) -> Optional[kal_ast.Expr]:
         """ `numberexpr ::= number` """
-        result = kal_ast.NumberExpr(self.curr_tok.value)
+        result = kal_ast.NumberExpr(float(self.curr_tok.value))
         self.curr_tok = next(self.tokens)  # eat number
         return result
 

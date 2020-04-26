@@ -18,7 +18,7 @@ class TokenType(Enum):
     OPERATOR = -6
 
 
-Token = namedtuple(typename="Token", field_names=["kind", "value"])
+Token = namedtuple(typename="Token", field_names=["type", "value"])
 
 
 class Lexer:
@@ -52,10 +52,10 @@ class Lexer:
 
                 if id_str == "def":
                     yield Token(TokenType.DEF, value=id_str)
-                if id_str == "extern":
+                elif id_str == "extern":
                     yield Token(TokenType.EXTERN, value=id_str)
-
-                yield Token(TokenType.IDENTIFIER, value=id_str)
+                else:
+                    yield Token(TokenType.IDENTIFIER, value=id_str)
 
             # Number: [0-9.]+
             elif self.last_char.isdigit() or self.last_char == ".":
@@ -63,7 +63,7 @@ class Lexer:
                 while self.last_char.isdigit() or self.last_char == ".":
                     num_str += self.last_char
                     self.last_char = self.__get_char()
-                yield Token(TokenType.NUMBER, value=float(num_str))
+                yield Token(TokenType.NUMBER, value=num_str)
 
             # Comment until end of line: #.*\n
             elif self.last_char == "#":
@@ -73,7 +73,7 @@ class Lexer:
 
             # Otherwise, just return the character
             elif self.last_char:
-                yield Token(kind=TokenType.OPERATOR, value=self.last_char)
+                yield Token(type=TokenType.OPERATOR, value=self.last_char)
                 self.last_char = self.__get_char()
 
-        yield Token(kind=TokenType.EOF, value="")
+        yield Token(type=TokenType.EOF, value="")
