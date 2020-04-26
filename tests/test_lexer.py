@@ -1,6 +1,8 @@
 import os
 import sys
 
+from typing import List
+
 try:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from kal_lexer import Lexer, Token, TokenType
@@ -8,7 +10,7 @@ except:
     pass
 
 
-def _assert_toks(toks, tok_type_names):
+def _assert_toks(toks: List[Token], tok_type_names: List[str]):
     """ Assert that the list of toks has the given types. """
     assert all(
         [tok.type.name == tok_type_name for tok, tok_type_name in zip(toks, tok_type_names)]

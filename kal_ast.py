@@ -4,15 +4,15 @@ from typing import List
 class Node:
     """ Base class for all AST nodes. """
 
-    def __repr__(self):
+    def __str__(self):
         return (
             f"{self.__class__.__name__}("
             + ", ".join([f"{k}={v}" for k, v in self.__dict__.items()])
             + ")"
         )
 
-    def __str__(self):
-        return f"{{{self.__class__.__name__}}}"
+    def __repr__(self):
+        return str(self)
 
 
 class Expr(Node):
@@ -24,8 +24,9 @@ class Expr(Node):
 class NumberExpr(Expr):
     """ Expression class for numeric literals, like `1.0`. """
 
-    def __init__(self, val: float):
+    def __init__(self, val: str):
         self.val = val
+        self._val = float(val)
 
 
 class VariableExpr(Expr):
