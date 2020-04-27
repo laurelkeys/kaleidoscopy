@@ -65,7 +65,7 @@ class Lexer:
                     self.last_char = self.__get_char()
                 yield Token(TokenType.NUMBER, value=num_str)
 
-            # Comment until end of line: #.*\n
+            # Comment (until end of line): #.*\n
             elif self.last_char == "#":
                 self.last_char = self.__get_char()
                 while self.last_char and self.last_char not in "\r\n":

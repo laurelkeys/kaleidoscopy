@@ -1,14 +1,12 @@
-import os
-import sys
+try:
+    from context import *
+except:
+    pass
 
 from typing import List, Optional
 
-try:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from kal_ast import Node, Prototype, Function, NumberExpr, VariableExpr, BinaryExpr, CallExpr
-    from kal_parser import Parser
-except:
-    pass
+from kal_ast import Node, CallExpr, Function, Prototype, BinaryExpr, NumberExpr, VariableExpr
+from kal_parser import Parser
 
 # ref.: https://github.com/eliben/pykaleidoscope/
 

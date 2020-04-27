@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import List
 
 
@@ -61,6 +63,19 @@ class Prototype(Node):
         self.name = name
         self.params = params
 
+    # ref.: https://github.com/frederickjeanguerin/pykaleidoscope
+
+    _anonymous_count = 0
+
+    @classmethod
+    def Anonymous(cls) -> Prototype:
+        """ Create an anonymous function prototype. """
+        cls._anonymous_count += 1
+        return Prototype(name=f"_anon_fn_{cls._anonymous_count}", params=[])
+
+    def is_anonymous(self) -> bool:
+        return self.name.startswith("_anon_fn")
+
 
 class Function(Node):
     """ This class represents a function definition itself. """
@@ -68,3 +83,13 @@ class Function(Node):
     def __init__(self, proto: Prototype, body: Expr):
         self.proto = proto
         self.body = body
+
+    # ref.: https://github.com/frederickjeanguerin/pykaleidoscope
+
+    @staticmethod
+    def Anonymous(body: Expr) -> Function:
+        """ Create an anonymous function to hold an expression. """
+        return Function(Prototype.Anonymous(), body)
+
+    def is_anonymous(self) -> bool:
+        return self.proto.is_anonymous()

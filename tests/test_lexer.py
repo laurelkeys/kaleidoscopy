@@ -1,13 +1,11 @@
-import os
-import sys
+try:
+    from context import *
+except:
+    pass
 
 from typing import List
 
-try:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from kal_lexer import Lexer, Token, TokenType
-except:
-    pass
+from kal_lexer import Lexer, Token, TokenType
 
 # ref.: https://github.com/eliben/pykaleidoscope/
 

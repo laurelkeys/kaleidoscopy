@@ -206,6 +206,6 @@ class Parser:
     def _parse_top_level_expr(self) -> Optional[kal_ast.Function]:
         """ `toplevelexpr ::= expression` """
         if expr := self._parse_expression():
-            # Make an anonymous function prototype
-            return kal_ast.Function(proto=kal_ast.Prototype(name="", params=[]), body=expr)
+            # Make an anonymous function prototype for top-level expressions
+            return kal_ast.Function.Anonymous(body=expr)
         return None

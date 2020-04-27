@@ -1,7 +1,6 @@
 from typing import Any, Dict
 
 import llvmlite.ir as ir
-import llvmlite.binding as llvm
 
 import kal_ast
 
@@ -23,11 +22,11 @@ class GenerateCodeError(Exception):
 class LLVMCodeGenerator(NodeVisitor):
     """ Node visitor class that generates SSA values for LLVM.
 
-        Note: each `_visit_<Node>()` method should return an appropriate `llvm.ir.Value`.
+        Note: each `_visit_<Node>()` method should return an appropriate `ir.Value`.
     """
 
     def __init__(self):
-        # Top level container of all other LLVM IR objects
+        # Top-level container of all other LLVM IR objects
         self.module: ir.Module = ir.Module()
 
         # Current IR builder
@@ -41,7 +40,7 @@ class LLVMCodeGenerator(NodeVisitor):
         return self._visit(node)
 
     def _visit_NumberExpr(self, node: kal_ast.NumberExpr) -> ir.Value:
-        return ir.Constant(ir.DoubleType, float(node.val))
+        return ir.Constant(ir.DoubleType(), float(node.val))
 
     def _visit_VariableExpr(self, node: kal_ast.VariableExpr) -> ir.Value:
         if value := self.symtab[node.name]:
@@ -81,7 +80,7 @@ class LLVMCodeGenerator(NodeVisitor):
     def _visit_Prototype(self, node: kal_ast.Prototype) -> ir.Value:
         fn_name = node.name
         fn_type = ir.FunctionType(
-            return_type=ir.DoubleType(), args=[ir.DoubleType() for _ in len(node.params)]
+            return_type=ir.DoubleType(), args=[ir.DoubleType() for _ in range(len(node.params))]
         )  # NOTE Kaleidoscope uses double precision floating point for all values
 
         if fn_name in self.module.globals:
@@ -93,7 +92,7 @@ class LLVMCodeGenerator(NodeVisitor):
             elif len(fn.function_type.args) != len(fn_type.args):
                 raise GenerateCodeError(f"Definition of '{fn_name}' with wrong argument count")
         else:
-            # Create a new function and set its argument names
+            # Create a new function and set its arguments names
             fn = ir.Function(module=self.module, ftype=fn_type, name=fn_name)
             for arg, arg_name in zip(fn.args, node.params):
                 arg.name = arg_name
@@ -103,7 +102,7 @@ class LLVMCodeGenerator(NodeVisitor):
 
     def _visit_Function(self, node: kal_ast.Function) -> ir.Value:
         # NOTE prototype generation will pre-populate symtab with function arguments
-        self.func_symtab = {}
+        self.symtab = {}
 
         fn: ir.Function = self._visit(node.proto)
 
