@@ -59,7 +59,7 @@ class LLVMCodeGenerator(NodeVisitor):
         elif node.op == "*":
             return self.builder.fmul(lhs, rhs, name="multmp")
         elif node.op == "<":
-            # NOTE: unordered means that either operand may be a QNAN (quite NaN)
+            # NOTE unordered means that either operand may be a QNAN (quite NaN)
             fcmp = self.builder.fcmp_unordered(cmpop="<", lhs=lhs, rhs=rhs, name="cmptmp")
             # Convert unsigned int 0 or 1 (bool) to double 0.0 or 1.0
             return self.builder.uitofp(value=fcmp, typ=ir.DoubleType(), name="booltmp")
@@ -79,7 +79,40 @@ class LLVMCodeGenerator(NodeVisitor):
         return self.builder.call(fn=callee_fn, args=call_args, name="calltmp")
 
     def _visit_Prototype(self, node: kal_ast.Prototype) -> ir.Value:
-        pass
+        fn_name = node.name
+        fn_type = ir.FunctionType(
+            return_type=ir.DoubleType(), args=[ir.DoubleType() for _ in len(node.params)]
+        )  # NOTE Kaleidoscope uses double precision floating point for all values
+
+        if fn_name in self.module.globals:
+            fn = self.module.globals[fn_name]
+            if not isinstance(fn, ir.Function):
+                raise GenerateCodeError(f"Function/global name collision '{fn_name}'")
+            elif not fn.is_declaration():
+                raise GenerateCodeError(f"Redefinition of '{fn_name}'")
+            elif len(fn.function_type.args) != len(fn_type.args):
+                raise GenerateCodeError(f"Definition of '{fn_name}' with wrong argument count")
+        else:
+            # Create a new function and set its argument names
+            fn = ir.Function(module=self.module, ftype=fn_type, name=fn_name)
+            for arg, arg_name in zip(fn.args, node.params):
+                arg.name = arg_name
+                self.symtab[arg.name] = arg
+
+        return fn
 
     def _visit_Function(self, node: kal_ast.Function) -> ir.Value:
-        pass
+        # NOTE prototype generation will pre-populate symtab with function arguments
+        self.func_symtab = {}
+
+        fn: ir.Function = self._visit(node.proto)
+
+        # Create a new basic block to start insertion into
+        bb_entry = fn.append_basic_block(name="entry")
+        self.builder = ir.IRBuilder(block=bb_entry)
+
+        # Finish off the function
+        fn_return_value: ir.Value = self._visit(node.body)
+        self.builder.ret(value=fn_return_value)
+
+        return fn
