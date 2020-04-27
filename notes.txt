@@ -21,3 +21,13 @@ Code generation for function calls is quite straightforward with LLVM.
 The code above initially does a function name lookup in the LLVM Module’s symbol table.
 Recall that the LLVM Module is the container that holds the functions we are JIT’ing.
 By giving each function the same name as what the user specifies, we can use the LLVM symbol table to resolve function names for us.
+
+Unfortunately, no amount of local analysis will be able to detect and correct this.
+This requires two transformations: reassociation of expressions (to make the add’s lexically identical)
+and Common Subexpression Elimination (CSE) to delete the redundant add instruction.
+Fortunately, LLVM provides a broad range of optimizations that you can use, in the form of “passes”.
+
+LLVM provides a wide variety of optimizations that can be used in certain circumstances.
+Some documentation about the various passes is available [[at http://llvm.org/docs/Passes.html]], but it isn’t very complete.
+Another good source of ideas can come from looking at the passes that Clang runs to get started.
+[[The ones recommended were: InstructionCombiningPass, ReassociatePass, GVNPass and CFGSimplificationPass.]]

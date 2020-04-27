@@ -71,7 +71,7 @@ class LLVMCodeGenerator(NodeVisitor):
 
         if callee_fn is None or not isinstance(callee_fn, ir.Function):
             raise GenerateCodeError(f"Call to unknown function '{node.callee}'")
-        if len(callee_fn.args) != len(node.args):
+        elif len(callee_fn.args) != len(node.args):
             raise GenerateCodeError(f"Call argument length mismatch for '{node.callee}'")
 
         call_args = [self._visit(arg) for arg in node.args]
@@ -87,7 +87,7 @@ class LLVMCodeGenerator(NodeVisitor):
             fn = self.module.globals[fn_name]
             if not isinstance(fn, ir.Function):
                 raise GenerateCodeError(f"Function/global name collision '{fn_name}'")
-            elif not fn.is_declaration():
+            elif not fn.is_declaration:
                 raise GenerateCodeError(f"Redefinition of '{fn_name}'")
             elif len(fn.function_type.args) != len(fn_type.args):
                 raise GenerateCodeError(f"Definition of '{fn_name}' with wrong argument count")

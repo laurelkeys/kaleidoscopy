@@ -1,26 +1,10 @@
-from enum import Enum
-from typing import Dict, List, Iterator, Optional
+from typing import List, Iterator, Optional
 
 import kal_ast
 import kal_lexer
 
+from kal_ops import operators, get_precedence
 from kal_lexer import Lexer, Token, TokenType
-
-
-class Associativity(Enum):
-    NON = 0
-    LEFT = 1
-    RIGHT = 2
-
-
-precedence: Dict[str, int] = {
-    # lowest precedence
-    "<": 10,
-    "+": 20,
-    "-": 20,
-    "*": 40,  # highest
-    # ...
-}
 
 
 class ParseError(Exception):
@@ -35,7 +19,7 @@ class Parser:
         self.tokens: Iterator[Token] = None
 
     def __curr_tok_precedence(self) -> int:
-        return precedence.get(self.curr_tok.value, -1)
+        return get_precedence(op=self.curr_tok.value)
 
     def __curr_tok_is_operator(self, operator: str) -> bool:
         return self.curr_tok.type == TokenType.OPERATOR and self.curr_tok.value == operator
