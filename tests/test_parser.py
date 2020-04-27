@@ -10,11 +10,7 @@ try:
 except:
     pass
 
-
-if __name__ == "__main__":
-    p = Parser()
-    for node in p.parse("def bina(a b) a + b"):
-        print(node.__repr__)
+# ref.: https://github.com/eliben/pykaleidoscope/
 
 
 def _flatten(ast: Node):

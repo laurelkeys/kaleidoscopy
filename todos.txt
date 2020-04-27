@@ -1,3 +1,0 @@
-- [ ] use the visitor pattern
-- [ ] test_lexer.py
-- [ ] test_parser.py

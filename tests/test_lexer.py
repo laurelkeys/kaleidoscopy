@@ -9,6 +9,8 @@ try:
 except:
     pass
 
+# ref.: https://github.com/eliben/pykaleidoscope/
+
 
 def _assert_toks(toks: List[Token], tok_type_names: List[str]):
     """ Assert that the list of toks has the given types. """
