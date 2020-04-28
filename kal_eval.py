@@ -1,5 +1,5 @@
 from ctypes import CFUNCTYPE, c_double
-from typing import Dict, Iterator, Optional
+from typing import Dict, List, Iterator, Optional
 from collections import namedtuple
 
 import llvmlite.binding as llvm
@@ -8,7 +8,7 @@ from termcolor import colored
 
 import kal_ast
 
-from kal_ir import LLVMCodeGenerator
+from kal_ir import GenerateCodeError, LLVMCodeGenerator
 from kal_parser import Parser
 
 # ref.: https://github.com/eliben/pykaleidoscope
@@ -16,7 +16,7 @@ from kal_parser import Parser
 
 
 EvalResult = namedtuple(
-    typename="EvalResult", field_names=["value", "ast", "unoptimized_ir", "optimized_ir"]
+    typename="EvalResult", field_names=["value", "ast", "unoptimized_ir", "optimized_ir"],
 )
 
 
@@ -37,6 +37,16 @@ class KaleidoscopeCodeEvaluator:
         self.code_generator = LLVMCodeGenerator()
 
         self.target = llvm.Target.from_default_triple()
+
+    def reset(self, history: Optional[List[kal_ast.Node]] = None) -> bool:
+        self.code_generator = LLVMCodeGenerator()
+        if history is not None:
+            try:
+                for ast in history:
+                    self._evaluate_ast(ast)
+                return True
+            except GenerateCodeError:
+                return False
 
     def evaluate(self, kal_code: str, options: Dict[str, bool] = None) -> Optional[float]:
         # NOTE since Kaleidoscope only deals with doubles, return types are always 'float'
@@ -94,7 +104,7 @@ class KaleidoscopeCodeEvaluator:
             with open("__dump__unoptimized.ll", "w") as dump:
                 dump.write(str(self.code_generator.module))
                 print(
-                    colored(f"Unoptimized LLVM IR code dumped to '{dump.name}'", color="yellow")
+                    colored(f"Unoptimized LLVM IR code dumped to '{dump.name}'", color="yellow",)
                 )
 
         # If we're evaluating an anonymous wrapper for a top-level expression,
@@ -121,7 +131,9 @@ class KaleidoscopeCodeEvaluator:
                 with open("__dump__optimized.ll", "w") as dump:
                     dump.write(str(llvmmod))
                     print(
-                        colored(f"Optimized LLVM IR code dumped to '{dump.name}'", color="yellow")
+                        colored(
+                            f"Optimized LLVM IR code dumped to '{dump.name}'", color="yellow",
+                        )
                     )
 
         opt_ir = None

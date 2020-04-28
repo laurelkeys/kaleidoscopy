@@ -43,7 +43,7 @@ class LLVMCodeGenerator(NodeVisitor):
         return ir.Constant(ir.DoubleType(), float(node.val))
 
     def _visit_VariableExpr(self, node: kal_ast.VariableExpr) -> ir.Value:
-        if value := self.symtab[node.name]:
+        if (value := self.symtab.get(node.name)) is not None:
             return value
         raise GenerateCodeError(f"Unknown variable name '{node.name}'")
 
@@ -69,7 +69,7 @@ class LLVMCodeGenerator(NodeVisitor):
         cond_value = self._visit(node.cond_expr)
         # NOTE ordered means that neither operand can be a QNAN (quite NaN)
         fcmp = self.builder.fcmp_ordered(
-            cmpop="!=", lhs=cond_value, rhs=ir.Constant(ir.DoubleType(), 0.0), name="ifcond"
+            cmpop="!=", lhs=cond_value, rhs=ir.Constant(ir.DoubleType(), 0.0), name="ifcond",
         )
 
         # Create basic blocks to express the control flow
@@ -82,7 +82,7 @@ class LLVMCodeGenerator(NodeVisitor):
         self.builder.function.basic_blocks.append(then_bb)
         self.builder.position_at_start(block=then_bb)
         then_value = self._visit(node.then_expr)
-        self.builder.branch(target=merge_bb)  # branch to 'endif'
+        self.builder.branch(target=merge_bb)  # branch to 'endif' after executing 'then'
 
         # NOTE Emission of then_value can modify the current basic block, so we
         # update then_bb for the PHI to remember which block the 'then' ends in
@@ -92,7 +92,7 @@ class LLVMCodeGenerator(NodeVisitor):
         self.builder.function.basic_blocks.append(else_bb)
         self.builder.position_at_start(block=else_bb)
         else_value = self._visit(node.else_expr)
-        self.builder.branch(target=merge_bb)  # branch to 'endif'
+        self.builder.branch(target=merge_bb)  # branch to 'endif' after executing 'else'
 
         # NOTE Emission of else_value can modify the current basic block, so we
         # update else_bb for the PHI to remember which block the 'else' ends in
@@ -101,10 +101,14 @@ class LLVMCodeGenerator(NodeVisitor):
         # Emit the merge ('endif') block
         self.builder.function.basic_blocks.append(merge_bb)
         self.builder.position_at_start(block=merge_bb)
-        phi = self.builder.phi(typ=ir.DoubleType(), name="iftmp")
+        phi: ir.PhiInstr = self.builder.phi(typ=ir.DoubleType(), name="iftmp")
         phi.add_incoming(value=then_value, block=then_bb)
         phi.add_incoming(value=else_value, block=else_bb)
         return phi
+
+    def _visit_ForExpr(self, node: kal_ast.IfExpr) -> ir.Value:
+        raise NotImplementedError
+        # TODO
 
     def _visit_CallExpr(self, node: kal_ast.CallExpr) -> ir.Value:
         # Look up the name in the global module table
@@ -121,7 +125,7 @@ class LLVMCodeGenerator(NodeVisitor):
     def _visit_Prototype(self, node: kal_ast.Prototype) -> ir.Value:
         fn_name = node.name
         fn_type = ir.FunctionType(
-            return_type=ir.DoubleType(), args=[ir.DoubleType() for _ in range(len(node.params))]
+            return_type=ir.DoubleType(), args=[ir.DoubleType() for _ in range(len(node.params))],
         )  # NOTE Kaleidoscope uses double precision floating point for all values
 
         if fn_name in self.module.globals:

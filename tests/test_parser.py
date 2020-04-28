@@ -52,7 +52,7 @@ def test_basic_with_flattening():
 def test_expr_singleprec():
     ast = next(Parser().parse("2+ 3-4"))
     _assert_body(
-        ast, ["Binop", "-", ["Binop", "+", ["Number", "2"], ["Number", "3"]], ["Number", "4"]]
+        ast, ["Binop", "-", ["Binop", "+", ["Number", "2"], ["Number", "3"]], ["Number", "4"],],
     )
 
 
@@ -63,7 +63,7 @@ def test_expr_multiprec():
         [
             "Binop",
             "-",
-            ["Binop", "+", ["Number", "2"], ["Binop", "*", ["Number", "3"], ["Number", "4"]]],
+            ["Binop", "+", ["Number", "2"], ["Binop", "*", ["Number", "3"], ["Number", "4"]],],
             ["Number", "9"],
         ],
     )
@@ -76,7 +76,7 @@ def test_expr_parens():
         [
             "Binop",
             "*",
-            ["Binop", "*", ["Number", "2"], ["Binop", "-", ["Number", "3"], ["Number", "4"]]],
+            ["Binop", "*", ["Number", "2"], ["Binop", "-", ["Number", "3"], ["Number", "4"]],],
             ["Number", "7"],
         ],
     )
@@ -100,7 +100,7 @@ def test_funcdef():
                 [
                     "Function",
                     ["Proto", "foo", "x"],
-                    ["Binop", "+", ["Number", "1"], ["Call", "bar", [["Variable", "x"]]]],
+                    ["Binop", "+", ["Number", "1"], ["Call", "bar", [["Variable", "x"]]],],
                 ],
             )
         ]

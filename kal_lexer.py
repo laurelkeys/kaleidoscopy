@@ -19,9 +19,11 @@ class TokenType(Enum):
     IF = -6
     THEN = -7
     ELSE = -8
+    FOR = -9
+    IN = -10
 
     # unknown character
-    OPERATOR = -9
+    OPERATOR = -11
 
 
 Token = namedtuple(typename="Token", field_names=["type", "value"])
@@ -33,7 +35,12 @@ keywords: Dict[str, Token] = {
     "if": Token(TokenType.IF, value="if"),
     "then": Token(TokenType.THEN, value="then"),
     "else": Token(TokenType.ELSE, value="else"),
+    "for": Token(TokenType.FOR, value="for"),
+    "in": Token(TokenType.IN, value="in"),
 }
+assert all([kw_key == kw.value for kw_key, kw in keywords.items()]) and (
+    len([kw.type for kw in keywords.values()]) == len(set([kw.type for kw in keywords.values()]))
+)
 
 
 class Lexer:

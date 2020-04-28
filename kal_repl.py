@@ -66,7 +66,11 @@ def print_eval(k, kal_code, options=None):
     except kal_ir.GenerateCodeError as err:
         errprint(f"GenerateCodeError: {str(err)}")
         # Reset the interpreter because kal_ir is now corrupted
-        k.reset(history)
+        if not (reran_history := k.reset(history)):
+            print(
+                colored("Could not run history:", color="red"),
+                ",".join((str(ast) for ast in history)),
+            )
 
     except Exception as err:
         errprint(str(type(err)) + ": " + str(err))

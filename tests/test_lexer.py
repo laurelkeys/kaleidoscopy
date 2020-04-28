@@ -34,7 +34,15 @@ def test_token_types():
     l = Lexer("10.1 def der extern foo (")
     _assert_toks(
         toks=list(l.tokens()),
-        tok_type_names=["NUMBER", "DEF", "IDENTIFIER", "EXTERN", "IDENTIFIER", "OPERATOR", "EOF"],
+        tok_type_names=[
+            "NUMBER",
+            "DEF",
+            "IDENTIFIER",
+            "EXTERN",
+            "IDENTIFIER",
+            "OPERATOR",
+            "EOF",
+        ],
     )
 
     l = Lexer("+- 1 2 22 22.4 a b2 C3d")

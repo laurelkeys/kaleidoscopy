@@ -55,12 +55,30 @@ class CallExpr(Expr):
 
 
 class IfExpr(Expr):
-    """ Expression class for if/then/else. """
+    """ Expression class for if/then/else.
+
+        if `cond_expr` then `then_expr` else `else_expr`
+    """
 
     def __init__(self, cond_expr: Expr, then_expr: Expr, else_expr: Expr):
         self.cond_expr = cond_expr
         self.then_expr = then_expr
         self.else_expr = else_expr
+
+
+class ForExpr(Expr):
+    """ Expression class for for/in.
+
+        for `id_name` = `init_expr`, `cond_expr`, `step_expr` in `body_expr`
+    """
+
+    def __init__(
+        self, id_name: str, init_expr: Expr, cond_expr: Expr, step_expr: Expr, body_expr: Expr
+    ):
+        self.init_expr = init_expr
+        self.cond_expr = cond_expr
+        self.step_expr = step_expr
+        self.body_expr = body_expr
 
 
 class Prototype(Node):

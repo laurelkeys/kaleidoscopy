@@ -30,7 +30,7 @@ class Parser:
         self.curr_tok = next(self.tokens)
 
         while self.curr_tok.type != TokenType.EOF:
-            if top_level := self._parse_top_level():
+            if (top_level := self._parse_top_level()) is not None:
                 yield top_level
 
     def _parse_top_level(self) -> Optional[kal_ast.Node]:
@@ -81,7 +81,7 @@ class Parser:
         if not self.__curr_tok_is_operator(")"):
             while True:
                 # args.append(self._parse_expression())
-                if arg := self._parse_expression():
+                if (arg := self._parse_expression()) is not None:
                     args.append(arg)
                 else:
                     return None
@@ -109,6 +109,9 @@ class Parser:
 
         elif self.curr_tok.type == TokenType.IF:
             return self._parse_if_expr()
+
+        elif self.curr_tok.type == TokenType.FOR:
+            return self._parse_for_expr()
 
         else:
             raise ParseError(
@@ -157,7 +160,8 @@ class Parser:
     def _parse_if_expr(self) -> Optional[kal_ast.Expr]:
         """ `ifexpr ::= 'if' expression 'then' expression 'else' expression` """
         self.curr_tok = next(self.tokens)  # eat 'if'
-        condition_expr = self._parse_expression()
+
+        cond_expr = self._parse_expression()
 
         if self.curr_tok.type != TokenType.THEN:
             raise ParseError("Expected 'then'")
@@ -169,7 +173,41 @@ class Parser:
         self.curr_tok = next(self.tokens)  # eat 'else'
         else_expr = self._parse_expression()
 
-        return kal_ast.IfExpr(condition_expr, then_expr, else_expr)
+        return kal_ast.IfExpr(cond_expr, then_expr, else_expr)
+
+    def _parse_for_expr(self) -> Optional[kal_ast.Expr]:
+        """ `forexpr ::= 'for' identifier '=' expr ',' expr (',' expr)? 'in' expression` """
+        self.curr_tok = next(self.tokens)  # eat 'for'
+
+        if self.curr_tok.type != TokenType.IDENTIFIER:
+            raise ParseError("Expected identifier after 'for'")
+        id_name = self.curr_tok.value
+        self.curr_tok = next(self.tokens)  # eat identifier
+
+        if not self.__curr_tok_is_operator("="):
+            raise ParseError("Expected '=' after 'for'")
+        self.curr_tok = next(self.tokens)  # eat '='
+
+        init_expr = self._parse_expression()
+
+        if not self.__curr_tok_is_operator(","):
+            raise ParseError("Expected ',' after 'for' init value")
+        self.curr_tok = next(self.tokens)  # eat ','
+
+        cond_expr = self._parse_expression()
+
+        step_expr = None  # the step value is optional
+        if self.__curr_tok_is_operator(","):
+            self.curr_tok = next(self.tokens)  # eat ','
+            step_expr = self._parse_expression()
+
+        if self.curr_tok.type != TokenType.IN:
+            raise ParseError("Expected 'in' after 'for'")
+        self.curr_tok = next(self.tokens)  # eat 'in'
+
+        body_expr = self._parse_expression()
+
+        return kal_ast.ForExpr(id_name, init_expr, cond_expr, step_expr, body_expr)
 
     def _parse_prototype(self) -> Optional[kal_ast.Prototype]:
         """ `prototype ::= id '(' id* ')'` """
@@ -209,7 +247,7 @@ class Parser:
 
     def _parse_top_level_expr(self) -> Optional[kal_ast.Function]:
         """ `toplevelexpr ::= expression` """
-        if expr := self._parse_expression():
+        if (expr := self._parse_expression()) is not None:
             # Make an anonymous function prototype for top-level expressions
             return kal_ast.Function.Anonymous(body=expr)
         return None

@@ -19,6 +19,8 @@ expression ::= primary binoprhs
 
 ifexpr ::= 'if' expression 'then' expression 'else' expression
 
+forexpr ::= 'for' identifier '=' expr ',' expr (',' expr)? 'in' expression
+
 binop ::= '<' | '+' | '-' | '*'
 
 binoprhs ::= (binop primary)*
@@ -31,6 +33,8 @@ external ::= 'extern' prototype
 
 top ::= definition | external | expression | ';'
 ```
+
+<!-- FIXME replace `id` by `identifier` here and in the code -->
 
 ## References
 - [LLVM Language Reference Manual](http://llvm.org/docs/LangRef.html)

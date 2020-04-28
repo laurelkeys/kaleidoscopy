@@ -19,17 +19,16 @@ operators: Dict[str, OperatorInfo] = {
     "*": OperatorInfo(Associativity.LEFT, precedence=40),
     # highest precedence
 }
-
 assert all([op.precedence >= 1 for op in operators.values()]), "1 is lowest definable precedence"
 
 
 def get_precedence(op: str) -> int:
-    if op_info := operators.get(op):
+    if (op_info := operators.get(op)) is not None:
         return op_info.precedence
     return -1  # non-operator (special value)
 
 
 def get_associativity(op: str) -> int:
-    if op_info := operators.get(op):
+    if (op_info := operators.get(op)) is not None:
         return op_info.associativity
     return Associativity.NON  # non-operator
