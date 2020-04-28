@@ -107,6 +107,9 @@ class Parser:
         elif self.__curr_tok_is_operator("("):
             return self._parse_paren_expr()
 
+        elif self.curr_tok.type == TokenType.IF:
+            return self._parse_if_expr()
+
         else:
             raise ParseError(
                 f"Unknown token '{self.curr_tok.value}' when expecting an expression"
@@ -150,6 +153,23 @@ class Parser:
 
             # Merge LHS/RHS
             lhs = kal_ast.BinaryExpr(bin_op, lhs, rhs)
+
+    def _parse_if_expr(self) -> Optional[kal_ast.Expr]:
+        """ `ifexpr ::= 'if' expression 'then' expression 'else' expression` """
+        self.curr_tok = next(self.tokens)  # eat 'if'
+        condition_expr = self._parse_expression()
+
+        if self.curr_tok.type != TokenType.THEN:
+            raise ParseError("Expected 'then'")
+        self.curr_tok = next(self.tokens)  # eat 'then'
+        then_expr = self._parse_expression()
+
+        if self.curr_tok.type != TokenType.ELSE:
+            raise ParseError("Expected 'else'")
+        self.curr_tok = next(self.tokens)  # eat 'else'
+        else_expr = self._parse_expression()
+
+        return kal_ast.IfExpr(condition_expr, then_expr, else_expr)
 
     def _parse_prototype(self) -> Optional[kal_ast.Prototype]:
         """ `prototype ::= id '(' id* ')'` """

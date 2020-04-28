@@ -1,8 +1,9 @@
-from enum import Enum
-from typing import Iterator
+from enum import Enum, unique
+from typing import Dict, Iterator
 from collections import namedtuple
 
 
+@unique
 class TokenType(Enum):
     EOF = -1
 
@@ -14,11 +15,25 @@ class TokenType(Enum):
     IDENTIFIER = -4
     NUMBER = -5
 
+    # control
+    IF = -6
+    THEN = -7
+    ELSE = -8
+
     # unknown character
-    OPERATOR = -6
+    OPERATOR = -9
 
 
 Token = namedtuple(typename="Token", field_names=["type", "value"])
+
+
+keywords: Dict[str, Token] = {
+    "def": Token(TokenType.DEF, value="def"),
+    "extern": Token(TokenType.EXTERN, value="extern"),
+    "if": Token(TokenType.IF, value="if"),
+    "then": Token(TokenType.THEN, value="then"),
+    "else": Token(TokenType.ELSE, value="else"),
+}
 
 
 class Lexer:
@@ -49,12 +64,9 @@ class Lexer:
                 while self.last_char.isalnum():
                     id_str += self.last_char
                     self.last_char = self.__get_char()
-
-                if id_str == "def":
-                    yield Token(TokenType.DEF, value=id_str)
-                elif id_str == "extern":
-                    yield Token(TokenType.EXTERN, value=id_str)
-                else:
+                try:
+                    yield keywords[id_str]
+                except KeyError:
                     yield Token(TokenType.IDENTIFIER, value=id_str)
 
             # Number: [0-9.]+

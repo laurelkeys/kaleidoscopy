@@ -20,7 +20,7 @@ class GenerateCodeError(Exception):
 
 
 class LLVMCodeGenerator(NodeVisitor):
-    """ Node visitor class that generates SSA values for LLVM.
+    """ Node visitor class that generates LLVM IR code.
 
         Note: each `_visit_<Node>()` method should return an appropriate `ir.Value`.
     """
@@ -64,6 +64,47 @@ class LLVMCodeGenerator(NodeVisitor):
             return self.builder.uitofp(value=fcmp, typ=ir.DoubleType(), name="booltmp")
         else:
             raise GenerateCodeError(f"Unknown binary operator '{node.op}'")
+
+    def _visit_IfExpr(self, node: kal_ast.IfExpr) -> ir.Value:
+        cond_value = self._visit(node.cond_expr)
+        # NOTE ordered means that neither operand can be a QNAN (quite NaN)
+        fcmp = self.builder.fcmp_ordered(
+            cmpop="!=", lhs=cond_value, rhs=ir.Constant(ir.DoubleType(), 0.0), name="ifcond"
+        )
+
+        # Create basic blocks to express the control flow
+        then_bb = ir.Block(self.builder.function, "then")
+        else_bb = ir.Block(self.builder.function, "else")
+        merge_bb = ir.Block(self.builder.function, "endif")
+        self.builder.cbranch(cond=fcmp, truebr=then_bb, falsebr=else_bb)
+
+        # Emit the 'then' block
+        self.builder.function.basic_blocks.append(then_bb)
+        self.builder.position_at_start(block=then_bb)
+        then_value = self._visit(node.then_expr)
+        self.builder.branch(target=merge_bb)  # branch to 'endif'
+
+        # NOTE Emission of then_value can modify the current basic block, so we
+        # update then_bb for the PHI to remember which block the 'then' ends in
+        then_bb = self.builder.block
+
+        # Emit the 'else' block
+        self.builder.function.basic_blocks.append(else_bb)
+        self.builder.position_at_start(block=else_bb)
+        else_value = self._visit(node.else_expr)
+        self.builder.branch(target=merge_bb)  # branch to 'endif'
+
+        # NOTE Emission of else_value can modify the current basic block, so we
+        # update else_bb for the PHI to remember which block the 'else' ends in
+        else_bb = self.builder.block
+
+        # Emit the merge ('endif') block
+        self.builder.function.basic_blocks.append(merge_bb)
+        self.builder.position_at_start(block=merge_bb)
+        phi = self.builder.phi(typ=ir.DoubleType(), name="iftmp")
+        phi.add_incoming(value=then_value, block=then_bb)
+        phi.add_incoming(value=else_value, block=else_bb)
+        return phi
 
     def _visit_CallExpr(self, node: kal_ast.CallExpr) -> ir.Value:
         # Look up the name in the global module table

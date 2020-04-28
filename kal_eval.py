@@ -91,10 +91,10 @@ class KaleidoscopeCodeEvaluator:
             raw_ir = str(self.code_generator.module).split("\n\n")[-1]
 
         if llvmdump:
-            with open("__dump__unoptimized.ll", "w") as dump_file:
-                dump_file.write(str(self.code_generator.module))
+            with open("__dump__unoptimized.ll", "w") as dump:
+                dump.write(str(self.code_generator.module))
                 print(
-                    colored(f"Unoptimized LLVM IR code dumped to '{dump_file}'", color="yellow")
+                    colored(f"Unoptimized LLVM IR code dumped to '{dump.name}'", color="yellow")
                 )
 
         # If we're evaluating an anonymous wrapper for a top-level expression,
@@ -118,10 +118,10 @@ class KaleidoscopeCodeEvaluator:
             pm.run(llvmmod)
 
             if llvmdump:
-                with open("__dump__optimized.ll", "w") as dump_file:
-                    dump_file.write(str(llvmmod))
+                with open("__dump__optimized.ll", "w") as dump:
+                    dump.write(str(llvmmod))
                     print(
-                        colored(f"Optimized LLVM IR code dumped to '{dump_file}'", color="yellow")
+                        colored(f"Optimized LLVM IR code dumped to '{dump.name}'", color="yellow")
                     )
 
         opt_ir = None
@@ -137,9 +137,9 @@ class KaleidoscopeCodeEvaluator:
             execution_engine.finalize_object()
 
             if llvmdump:
-                with open("__dump__assembler.asm", "w") as dump_file:
-                    dump_file.write(target_machine.emit_assembly(llvmmod))
-                    print(colored(f"Machine code dumped to '{dump_file}'", color="yellow"))
+                with open("__dump__assembler.asm", "w") as dump:
+                    dump.write(target_machine.emit_assembly(llvmmod))
+                    print(colored(f"Machine code dumped to '{dump.name}'", color="yellow"))
 
             fn_ptr = CFUNCTYPE(c_double)(execution_engine.get_function_address(ast.proto.name))
 

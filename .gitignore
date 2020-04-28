@@ -3,5 +3,8 @@
 __pycache__/
 .pytest_cache/
 
+# llvmdump
+__dump__*
+
 # venv
 kal/

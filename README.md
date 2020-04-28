@@ -17,6 +17,8 @@ primary
 
 expression ::= primary binoprhs
 
+ifexpr ::= 'if' expression 'then' expression 'else' expression
+
 binop ::= '<' | '+' | '-' | '*'
 
 binoprhs ::= (binop primary)*

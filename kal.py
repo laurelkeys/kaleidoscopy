@@ -13,12 +13,13 @@ import kal_repl
 
 def run(**options):
     cprint(
-        "\nKaleidoscope REPL originally created by Frederic Guerin and distributed as free software\nReference: https://github.com/frederickjeanguerin",
+        "Kaleidoscope REPL originally created by Frederic Guerin and distributed as free software\nReference: https://github.com/frederickjeanguerin/pykaleidoscope",
         color="magenta",
     )
-    print("Python :", sys.version)
-    print("LLVM   :", ".".join((str(n) for n in llvmlite.binding.llvm_version_info)))
-    print()
+    cprint(
+        f"\nPython : {sys.version}\nLLVM   : {'.'.join((str(n) for n in llvmlite.binding.llvm_version_info))}\n",
+        color="magenta",
+    )
     while True:
         try:
             kal_repl.run(options)

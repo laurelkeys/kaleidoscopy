@@ -26,8 +26,7 @@ history = []
 
 
 USAGE = """
-USAGE: From the K> prompt, either type some Kaleidoscope code or enter
-       one the following special commands (all preceded by a dot sign):
+USAGE: Type Kaleidoscope code or enter one the following special commands:
 
     .exit or exit : Stop and exit the program.
     .functions    : List all available language functions and operators.
@@ -159,9 +158,12 @@ def run(optimize=True, llvmdump=False, noexec=False, parseonly=False, verbose=Fa
     cprint("Type help or a command to be interpreted", color="green")
     command = ""
     while not command in ["exit", "quit"]:
-        run_command(k, command, options)
-        print("K> ", end="")
-        command = input().strip()
+        try:
+            run_command(k, command, options)
+            print("K> ", end="")
+            command = input().strip()
+        except KeyboardInterrupt:
+            sys.exit()
 
 
 if __name__ == "__main__":

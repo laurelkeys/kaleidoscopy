@@ -54,6 +54,15 @@ class CallExpr(Expr):
         self.args = args
 
 
+class IfExpr(Expr):
+    """ Expression class for if/then/else. """
+
+    def __init__(self, cond_expr: Expr, then_expr: Expr, else_expr: Expr):
+        self.cond_expr = cond_expr
+        self.then_expr = then_expr
+        self.else_expr = else_expr
+
+
 class Prototype(Node):
     """ This class represents the \"prototype\" for a function, which captures its name,
         and its argument names (thus implicitly the number of arguments the function takes).
