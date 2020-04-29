@@ -38,6 +38,8 @@ class KaleidoscopeCodeEvaluator:
         self.code_generator = LLVMCodeGenerator()
         self.__add_built_ins()
 
+        self.parser = Parser()
+
         self.target = llvm.Target.from_default_triple()
 
     def __add_built_ins(self):
@@ -59,6 +61,7 @@ class KaleidoscopeCodeEvaluator:
 
     def reset(self, history: Optional[List[kal_ast.Node]] = None) -> bool:
         self.code_generator = LLVMCodeGenerator()
+        self.__add_built_ins()
         if history is not None:
             try:
                 for ast in history:
@@ -78,7 +81,7 @@ class KaleidoscopeCodeEvaluator:
             Return value is `None` for definitions and 'extern's, and the evaluated expression value for top-level expressions.
         """
         # Parse the given Kaleidoscope code and generate LLVM IR code from it
-        for ast in Parser().parse(kal_code):
+        for ast in self.parser.parse(kal_code):
             # FIXME `options` may make the `.value` result a `str` instead of a `float`
             yield self._evaluate_ast(ast, **options)
 

@@ -48,6 +48,14 @@ class BinaryExpr(Expr):
         self.rhs = rhs
 
 
+class UnaryExpr(Expr):
+    """ Expression class for a unary operator. """
+
+    def __init__(self, op: str, operand: Expr):
+        self.op = op
+        self.operand = operand
+
+
 class CallExpr(Expr):
     """ Expression class for function calls. """
 

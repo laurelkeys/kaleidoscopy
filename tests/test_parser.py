@@ -5,7 +5,16 @@ except:
 
 from typing import List, Optional
 
-from kal_ast import Node, CallExpr, Function, Prototype, BinaryExpr, NumberExpr, VariableExpr
+from kal_ast import (
+    Node,
+    CallExpr,
+    Function,
+    Prototype,
+    UnaryExpr,
+    BinaryExpr,
+    NumberExpr,
+    VariableExpr,
+)
 from kal_parser import Parser
 
 # ref.: https://github.com/eliben/pykaleidoscope/
@@ -18,6 +27,8 @@ def _flatten(ast: Node):
         return ["Variable", ast.name]
     elif isinstance(ast, BinaryExpr):
         return ["Binop", ast.op, _flatten(ast.lhs), _flatten(ast.rhs)]
+    elif isinstance(ast, UnaryExpr):
+        return ["Unary", ast.op, _flatten(ast.operand)]
     elif isinstance(ast, CallExpr):
         args = [_flatten(arg) for arg in ast.args]
         return ["Call", ast.callee, args]
@@ -105,3 +116,65 @@ def test_funcdef():
             )
         ]
     )
+
+
+def test_unary():
+    p = Parser()
+    ast = next(p.parse("def unary!(x) 0 - x"))
+    assert isinstance(ast, Function)
+    proto = ast.proto
+    assert isinstance(proto, Prototype)
+    assert proto.is_operator
+    assert proto.name == "unary!"
+
+    ast = next(p.parse("!a + !b - !!c"))
+    _assert_body(
+        ast,
+        [
+            "Binop",
+            "-",
+            ["Binop", "+", ["Unary", "!", ["Variable", "a"]], ["Unary", "!", ["Variable", "b"]]],
+            ["Unary", "!", ["Unary", "!", ["Variable", "c"]]],
+        ],
+    )
+
+
+def test_binary_op_with_prec():
+    ast = next(Parser().parse("def binary% 77(a b) a + b"))
+    assert isinstance(ast, Function)
+    proto = ast.proto
+    assert isinstance(proto, Prototype)
+    assert proto.is_operator
+    assert proto.bin_op_precedence == 77
+    assert proto.name == "binary%"
+
+
+def test_binop_relative_precedence():
+    # with precedence 77, % binds stronger than all existing ops
+    p = Parser()
+    p.parse("def binary% 77(a b) a + b")
+    ast = next(p.parse("a * 10 % 5 * 10"))
+    _assert_body(
+        ast,
+        [
+            "Binop",
+            "*",
+            ["Binop", "*", ["Variable", "a"], ["Binop", "%", ["Number", "10"], ["Number", "5"]]],
+            ["Number", "10"],
+        ],
+    )
+
+    ast = next(p.parse("a % 20 * 5"))
+    _assert_body(
+        ast, ["Binop", "*", ["Binop", "%", ["Variable", "a"], ["Number", "20"]], ["Number", "5"]]
+    )
+
+
+def test_binary_op_no_prec():
+    ast = next(Parser().parse("def binary $(a b) a + b"))
+    assert isinstance(ast, Function)
+    proto = ast.proto
+    assert isinstance(proto, Prototype)
+    assert proto.is_operator
+    assert proto.bin_op_precedence == 30
+    assert proto.name == "binary$"

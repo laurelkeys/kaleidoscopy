@@ -66,3 +66,29 @@ def test_for():
     )
     assert e.evaluate("foo(1, 2, 3)") == 0
     assert e.evaluate("foo(3, 2, 30)") == 60
+
+
+def test_custom_binop():
+    e = KaleidoscopeCodeEvaluator()
+    e.evaluate("def binary% (a b) a - b")
+    assert e.evaluate("10 % 5") == 5
+    assert e.evaluate("100 % 5.5") == 94.5
+
+
+def test_custom_unop():
+    e = KaleidoscopeCodeEvaluator()
+    e.evaluate("def unary!(a) 0 - a")
+    e.evaluate("def unary^(a) a * a")
+    assert e.evaluate("!10") == -10
+    assert e.evaluate("^10") == 100
+    assert e.evaluate("!^10") == -100
+    assert e.evaluate("^!10") == 100
+
+
+def test_mixed_ops():
+    e = KaleidoscopeCodeEvaluator()
+    e.evaluate("def unary!(a) 0 - a")
+    e.evaluate("def unary^(a) a * a")
+    e.evaluate("def binary% (a b) a - b")
+    assert e.evaluate("!10 % !20") == 10
+    assert e.evaluate("^(!10 % !20)") == 100

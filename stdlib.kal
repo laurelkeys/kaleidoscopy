@@ -1,3 +1,5 @@
+# ref.: https://github.com/frederickjeanguerin/pykaleidoscope
+
 # Logical unary not
 def unary!(v)
   if v then
@@ -21,3 +23,11 @@ def binary| 5 (lhs rhs)
 # Define '=' with slightly lower precedence than relationals
 def binary= 9 (lhs rhs)
   !(lhs < rhs | lhs > rhs);
+
+# Sequence operator
+def binary: 1 (lhs rhs)
+    rhs
+
+# Unary '-'
+def unary- (x)
+    0 - x

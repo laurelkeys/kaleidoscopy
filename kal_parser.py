@@ -130,14 +130,14 @@ class Parser:
             )
 
     def _parse_expression(self) -> Optional[kal_ast.Expr]:
-        """ `expression ::= primary binoprhs` """
-        lhs = self._parse_primary()
+        """ `expression ::= unary binoprhs` """
+        lhs = self._parse_unary()
         # NOTE Start with precedence 0 because we want to
         # bind any operator to the expression at this point
         return self._parse_bin_op_rhs(expr_prec=0, lhs=lhs)
 
     def _parse_bin_op_rhs(self, expr_prec: int, lhs: kal_ast.Expr) -> Optional[kal_ast.Expr]:
-        """ `binoprhs ::= (binop primary)*`
+        """ `binoprhs ::= (<binop> unary)*`
 
             Note: `expr_prec` is the minimum precedence to keep going (precedence climbing).
         """
@@ -152,12 +152,12 @@ class Parser:
                 # so this condition handles cases when the expression ended
                 return lhs
 
-            # Okay, we know this is a binop
+            # Binary operator
             bin_op = self.curr_tok.value
-            self.curr_tok = next(self.tokens)  # eat binop
+            self.curr_tok = next(self.tokens)  # eat <binop>
 
-            # Parse the primary expression after the binary operator
-            rhs = self._parse_primary()
+            # Parse the unary expression after the binary operator
+            rhs = self._parse_unary()
 
             # If bin_op binds less tightly with RHS than the operator
             # after RHS, let the pending operator take RHS as its LHS
@@ -167,6 +167,19 @@ class Parser:
 
             # Merge LHS/RHS
             lhs = kal_ast.BinaryExpr(bin_op, lhs, rhs)
+
+    def _parse_unary(self) -> Optional[kal_ast.Expr]:
+        """ `unary ::= primary
+                     | <unop> unary`
+        """
+        # If the current token is not an operator, it must be a primary expression
+        if not self.curr_tok.type == TokenType.OPERATOR or self.curr_tok.value in ["(", ","]:
+            return self._parse_primary()
+
+        # Unary operator
+        un_op = self.curr_tok.value
+        self.curr_tok = next(self.tokens)  # eat <unop>
+        return kal_ast.UnaryExpr(op=un_op, operand=self._parse_unary())
 
     def _parse_if_expr(self) -> Optional[kal_ast.Expr]:
         """ `ifexpr ::= 'if' expression 'then' expression 'else' expression` """
@@ -228,10 +241,13 @@ class Parser:
         raise NotImplementedError
 
     def _parse_prototype(self) -> Optional[kal_ast.Prototype]:
-        """ `prototype ::= identifier '(' identifier* ')'`
-                         | 'binary' LETTER number? (identifier, identifier)
+        """ `prototype ::= identifier '(' identifier* ')'
+                         | 'binary' LETTER number? '(' identifier identifier ')'
+                         | 'unary' LETTER '(' identifier ')'`
         """
         is_user_defined_operator = False
+
+        # FIXME
 
         if self.curr_tok.type == TokenType.IDENTIFIER:
             fn_name = self.curr_tok.value
@@ -256,8 +272,17 @@ class Parser:
                 precedence = kal_ops.DEFAULT_PRECEDENCE
 
             operators[fn_name[-1]] = kal_ops.OperatorInfo(
-                kal_ops.Associativity.LEFT, precedence=precedence  # FIXME associativty
+                kal_ops.Associativity.NON, precedence=precedence  # FIXME associativty
             )
+
+        elif self.curr_tok.type == TokenType.UNARY:
+            is_user_defined_operator = True
+
+            self.curr_tok = next(self.tokens)  # eat 'unary'
+            if self.curr_tok.type != TokenType.OPERATOR:
+                raise ParseError("Expected operator after 'unary'")
+            fn_name = f"unary{self.curr_tok.value}"
+            self.curr_tok = next(self.tokens)  # eat LETTER
 
         else:
             raise ParseError("Expected function name in prototype")

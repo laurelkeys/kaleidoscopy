@@ -14,15 +14,22 @@ external ::= 'extern' prototype
 toplevelexpr ::= expression
 
 prototype ::= identifier '(' identifier* ')'
+            | 'binary' LETTER number? '(' identifier identifier ')'
+            | 'unary' LETTER '(' identifier ')'
 
-expression ::= primary binoprhs
+expression ::= unary binoprhs
 
-binoprhs ::= (binop primary)*
+binoprhs ::= (<binop> unary)*
 
 binop ::= '<'
         | '+'
         | '-'
         | '*'
+
+unary ::= primary
+        | <unop> unary
+
+unop ::= '!'
 
 primary ::= identifierexpr
           | numberexpr
@@ -42,10 +49,7 @@ ifexpr ::= 'if' expression 'then' expression 'else' expression
 forexpr ::= 'for' identifier '=' expr ',' expr (',' expr)? 'in' expression
 ```
 
-<!-- FIXME replace `id` by `identifier` here and in the code -->
-
 ## References
-- [LLVM Language Reference Manual](http://llvm.org/docs/LangRef.html)
 - ["Kaleidoscope" language](http://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl01.html), from the [LLVM Tutorial](http://llvm.org/docs/tutorial/MyFirstLanguageFrontend/index.html)
 - [frederickjeanguerin](https://github.com/frederickjeanguerin)'s [pykaleidoscope](https://github.com/frederickjeanguerin/pykaleidoscope)
 - [eliben](https://github.com/eliben)'s [pykaleidoscope](https://github.com/eliben/pykaleidoscope)

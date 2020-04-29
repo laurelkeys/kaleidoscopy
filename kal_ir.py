@@ -63,12 +63,22 @@ class LLVMCodeGenerator(NodeVisitor):
             fcmp = self.builder.fcmp_unordered(cmpop="<", lhs=lhs, rhs=rhs, name="cmptmp")
             # Convert unsigned int 0 or 1 (bool) to double 0.0 or 1.0
             return self.builder.uitofp(fcmp, ir.DoubleType(), "booltmp")
+        elif node.op not in kal_ops.operators:
+            raise GenerateCodeError(f"Unknown binary operator '{node.op}'")
         else:
-            if node.op not in kal_ops.operators:
-                raise GenerateCodeError(f"Unknown binary operator '{node.op}'")
             # User-defined binary operator
             user_def_bin_op_fn = self.module.globals[f"binary{node.op}"]
             return self.builder.call(fn=user_def_bin_op_fn, args=[lhs, rhs], name="binop")
+
+    def _visit_UnaryExpr(self, node: kal_ast.UnaryExpr) -> ir.Value:
+        operand = self._visit(node.operand)
+
+        # NOTE There are no pre-defined unary opeartors (unlike with binary operators)
+
+        # User-defined unary operator
+        if (user_def_un_op_fn := self.module.globals.get(f"unary{node.op}")) is not None:
+            return self.builder.call(fn=user_def_un_op_fn, args=[operand], name="unop")
+        raise GenerateCodeError(f"Unknown unary operator '{node.op}'")
 
     def _visit_IfExpr(self, node: kal_ast.IfExpr) -> ir.Value:
         cond_value = self._visit(node.cond_expr)
