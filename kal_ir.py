@@ -61,7 +61,7 @@ class LLVMCodeGenerator(NodeVisitor):
             # NOTE unordered means that either operand may be a QNAN (quite NaN)
             fcmp = self.builder.fcmp_unordered(cmpop="<", lhs=lhs, rhs=rhs, name="cmptmp")
             # Convert unsigned int 0 or 1 (bool) to double 0.0 or 1.0
-            return self.builder.uitofp(value=fcmp, typ=ir.DoubleType(), name="booltmp")
+            return self.builder.uitofp(fcmp, ir.DoubleType(), "booltmp")
         else:
             raise GenerateCodeError(f"Unknown binary operator '{node.op}'")
 
@@ -106,9 +106,71 @@ class LLVMCodeGenerator(NodeVisitor):
         phi.add_incoming(value=else_value, block=else_bb)
         return phi
 
-    def _visit_ForExpr(self, node: kal_ast.IfExpr) -> ir.Value:
-        raise NotImplementedError
-        # TODO
+    def _visit_ForExpr(self, node: kal_ast.ForExpr) -> ir.Value:
+        # Emit the initializer code first, without the loop variable in scope
+        init_value = self._visit(node.init_expr)
+
+        # Make the new basic block for the loop header, inserting it after the current block
+        preheader_bb = self.builder.block
+        loop_body_bb = ir.Block(self.builder.function, "loopbody")
+        self.builder.function.basic_blocks.append(loop_body_bb)
+
+        # Insert an explicit fall through from the current block to loop_body_bb
+        self.builder.branch(target=loop_body_bb)
+
+        # Start insertion in the loop_body_bb
+        self.builder.position_at_start(block=loop_body_bb)
+
+        # Start the PHI node with an entry for init_value
+        phi: ir.PhiInstr = self.builder.phi(typ=ir.DoubleType(), name=node.id_name)
+        phi.add_incoming(value=init_value, block=preheader_bb)
+
+        # Within the loop, the variable is defined equal to the PHI node
+        # If it shadows an existing variable, we have to restore it, so we save it now
+        old_value = self.symtab.get(node.id_name)
+        self.symtab[node.id_name] = phi
+
+        # Emit the body of the loop
+        # NOTE This, like any other expr, can change the current BB
+        _body_value = self._visit(node.body_expr)  # NOTE we ignore the computed value
+
+        # Emit the step value
+        step_value = (
+            ir.Constant(ir.DoubleType(), 1.0)  # if not specified, use 1.0
+            if node.step_expr is None
+            else self._visit(node.step_expr)
+        )
+
+        next_loop_var_value = self.builder.fadd(phi, step_value, "nextloopvar")
+
+        # Compute the end-loop condition and convert it to a bool
+        cond_value = self._visit(node.cond_expr)
+        fcmp = self.builder.fcmp_ordered(
+            cmpop="!=", lhs=cond_value, rhs=ir.Constant(ir.DoubleType(), 0.0), name="loopcond"
+        )
+
+        # Create the "after loop" block and insert it
+        loop_end_bb = self.builder.block
+        after_loop_bb = ir.Block(self.builder.function, "afterloop")  # TODO rename to 'endfor'
+        self.builder.function.basic_blocks.append(after_loop_bb)
+
+        # Insert the conditional branch into the end of loop_end_bb
+        self.builder.cbranch(cond=fcmp, truebr=loop_body_bb, falsebr=after_loop_bb)
+
+        # Any new code will be inserted in after_loop_bb
+        self.builder.position_at_start(block=after_loop_bb)
+
+        # Add a new entry to the PHI node for the backedge
+        phi.add_incoming(value=next_loop_var_value, block=loop_end_bb)
+
+        # Remove the loop variable from the symbol table
+        if old_value is None:
+            del self.symtab[node.id_name]
+        else:
+            self.symtab[node.id_name] = old_value  # restore the shadowed variable
+
+        # The 'for' expression always returns 0.0
+        return ir.Constant(ir.DoubleType(), 0.0)
 
     def _visit_CallExpr(self, node: kal_ast.CallExpr) -> ir.Value:
         # Look up the name in the global module table

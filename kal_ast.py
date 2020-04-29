@@ -75,6 +75,7 @@ class ForExpr(Expr):
     def __init__(
         self, id_name: str, init_expr: Expr, cond_expr: Expr, step_expr: Expr, body_expr: Expr
     ):
+        self.id_name = id_name
         self.init_expr = init_expr
         self.cond_expr = cond_expr
         self.step_expr = step_expr

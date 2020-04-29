@@ -44,9 +44,9 @@ class KaleidoscopeCodeEvaluator:
             try:
                 for ast in history:
                     self._evaluate_ast(ast)
-                return True
             except GenerateCodeError:
                 return False
+        return True  # successfully reset
 
     def evaluate(self, kal_code: str, options: Dict[str, bool] = None) -> Optional[float]:
         # NOTE since Kaleidoscope only deals with doubles, return types are always 'float'
