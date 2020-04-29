@@ -1,17 +1,12 @@
-# ref.: https://github.com/frederickjeanguerin/pykaleidoscope
+def unary! (v)
+  if v then 0 else 1;
 
-# Logical unary not
-def unary!(v)
-  if v then
-    0
-  else
-    1;
+def unary- (v)
+  0-v;
 
-# Define '>' with the same precedence as '<'
 def binary> 10 (lhs rhs)
   rhs < lhs;
 
-# Binary "logical or" (note that it does not "short circuit")
 def binary| 5 (lhs rhs)
   if lhs then
     1
@@ -20,14 +15,19 @@ def binary| 5 (lhs rhs)
   else
     0;
 
-# Define '=' with slightly lower precedence than relationals
+def binary& 6 (lhs rhs)
+  if !lhs then
+    0
+  else
+    !!rhs;
+
 def binary= 9 (lhs rhs)
   !(lhs < rhs | lhs > rhs);
 
-# Sequence operator
-def binary: 1 (lhs rhs)
-    rhs
+def binary: 1 (x y) y;
 
-# Unary '-'
-def unary- (x)
-    0 - x
+# NOTES:
+# - defined '>' with the same precedence as '<'
+# - both the logical or '|' and the logical and '&' do not "short circuit"
+# - defined '=' (equality comparison) with slightly lower precedence than relationals
+# - ':' is defined for sequencing, it's a low-precedence operator that ignores operands and just returns the RHS

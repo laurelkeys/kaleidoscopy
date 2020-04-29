@@ -45,7 +45,7 @@ def errprint(msg):
 
 def print_eval(k, kal_code, options=None):
     """ Evaluate the given code with `k` using the given `options` and print the results. """
-    results = k._evaluate(kal_code, options)
+    results = k._evaluate(kal_code, options or {})
     try:
         for result in results:
             if (value := result.value) is not None:
@@ -131,11 +131,12 @@ def run_repl_command(k, command, options):
         reload(kal_parser)
         k.reset()
         history = []
+        run_repl_command(k, "stdlib.kal", {})
     elif command:
         # Here the command should be a filename
         try:
-            with open(command) as file:
-                print_eval(k, file.read(), options)
+            with open(command) as kal_file:
+                print_eval(k, kal_file.read(), options)
         except FileNotFoundError:
             errprint(f"File not found: '{command}'")
 
@@ -160,7 +161,7 @@ def run(optimize=True, llvmdump=False, noexec=False, parseonly=False, verbose=Fa
 
     # Enter a REPL loop
     cprint("Type help or a command to be interpreted", color="green")
-    command = ""
+    command = ".stdlib.kal"
     while not command in ["exit", "quit"]:
         try:
             run_command(k, command, options)

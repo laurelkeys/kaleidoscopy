@@ -6,6 +6,7 @@ import llvmlite
 
 from termcolor import cprint
 
+import kal_eval
 import kal_repl
 
 # ref.: https://github.com/frederickjeanguerin/pykaleidoscope
@@ -30,4 +31,11 @@ def run(**options):
 
 
 if __name__ == "__main__":
-    run()
+    if len(sys.argv) == 1:
+        run()
+    else:
+        try:
+            with open(sys.argv[1]) as kal_file:
+                kal_repl.print_eval(kal_eval.KaleidoscopeCodeEvaluator(), kal_file.read(), {})
+        except FileNotFoundError:
+            kal_repl.errprint(f"File not found: '{sys.argv[1]}'")
