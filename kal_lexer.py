@@ -22,10 +22,13 @@ class TokenType(Enum):
     FOR = -9
     IN = -10
 
+    # mutable variable definition
+    VAR = -11
+
     # operators
-    OPERATOR = -11  # unknown character
-    BINARY = -12
-    UNARY = -13
+    OPERATOR = -12  # unknown character
+    BINARY = -13
+    UNARY = -14
 
 
 Token = namedtuple(typename="Token", field_names=["type", "value"])
@@ -39,6 +42,7 @@ keywords: Dict[str, Token] = {
     "else": Token(TokenType.ELSE, value="else"),
     "for": Token(TokenType.FOR, value="for"),
     "in": Token(TokenType.IN, value="in"),
+    "var": Token(TokenType.VAR, value="var"),
     "binary": Token(TokenType.BINARY, value="binary"),
     "unary": Token(TokenType.UNARY, value="unary"),
 }

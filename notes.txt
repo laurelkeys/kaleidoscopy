@@ -53,3 +53,77 @@ In this case, it is really easy to generate the Phi node, so we choose to do it 
 One interesting (and very important) aspect of the LLVM IR is that it requires all basic blocks to be “terminated” with a control flow instruction such as return or branch.
 This means that all control flow, including fall throughs must be made explicit in the LLVM IR.
 If you violate this rule, the verifier will emit an error.
+
+The ‘trick’ here is that while LLVM does require all register values to be in SSA form, it does not require (or permit) memory objects to be in SSA form.
+This differs from some other compiler systems, which do try to version memory objects.
+In LLVM, instead of encoding dataflow analysis of memory into the LLVM IR, it is handled with Analysis Passes which are computed on demand.
+With this in mind, the high-level idea is that we want to make a stack variable (which lives in memory, because it is on the stack) for each mutable object in a function.
+
+In LLVM, all memory accesses are explicit with load/store instructions, and it is carefully designed not to have (or need) an “address-of” operator.
+
+define i32 @example() {
+entry:
+  %X = alloca i32           ; type of %X is i32*.
+  ...
+  %tmp = load i32* %X       ; load the stack value %X from the stack.
+  %tmp2 = add i32 %tmp, 1   ; increment it
+  store i32 %tmp2, i32* %X  ; store it back
+  ...
+
+We could rewrite the example to use the alloca technique to avoid using a PHI node:
+#######################
+## with a PHI node ####
+#######################
+@G = weak global i32 0   ; type of @G is i32*
+@H = weak global i32 0   ; type of @H is i32*
+
+define i32 @test(i1 %Condition) {
+entry:
+  br i1 %Condition, label %cond_true, label %cond_false
+
+cond_true:
+  %X.0 = load i32* @G
+  br label %cond_next
+
+cond_false:
+  %X.1 = load i32* @H
+  br label %cond_next
+
+cond_next:
+  %X.2 = phi i32 [ %X.1, %cond_false ], [ %X.0, %cond_true ]
+  ret i32 %X.2
+}
+#######################
+## with alloca ########
+#######################
+@G = weak global i32 0   ; type of @G is i32*
+@H = weak global i32 0   ; type of @H is i32*
+
+define i32 @test(i1 %Condition) {
+entry:
+  %X = alloca i32           ; type of %X is i32*.
+  br i1 %Condition, label %cond_true, label %cond_false
+
+cond_true:
+  %X.0 = load i32* @G
+  store i32 %X.0, i32* %X   ; Update X
+  br label %cond_next
+
+cond_false:
+  %X.1 = load i32* @H
+  store i32 %X.1, i32* %X   ; Update X
+  br label %cond_next
+
+cond_next:
+  %X.2 = load i32* %X       ; Read X
+  ret i32 %X.2
+}
+#######################
+
+With this, we have discovered a way to handle arbitrary mutable variables without the need to create Phi nodes at all:
+1. Each mutable variable becomes a stack allocation.
+2. Each read of the variable becomes a load from the stack.
+3. Each update of the variable becomes a store to the stack.
+4. Taking the address of a variable just uses the stack address directly.
+
+Fortunately for us, the LLVM optimizer has a highly-tuned optimization pass named “mem2reg” that handles this case, promoting allocas like this into SSA registers, inserting Phi nodes as appropriate.

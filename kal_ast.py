@@ -32,6 +32,9 @@ class NumberExpr(Expr):
         self.val = val
 
 
+# class VarExpr(Expr):
+
+
 class VariableExpr(Expr):
     """ Expression class for referencing a variable, like `a`. """
 

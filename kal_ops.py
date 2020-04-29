@@ -15,6 +15,7 @@ DEFAULT_PRECEDENCE = 30  # used for user-defined binary operators
 
 operators: Dict[str, OperatorInfo] = {
     # lowest precedence
+    "=": OperatorInfo(Associativity.RIGHT, precedence=2),
     "<": OperatorInfo(Associativity.LEFT, precedence=10),
     "+": OperatorInfo(Associativity.LEFT, precedence=20),
     "-": OperatorInfo(Associativity.LEFT, precedence=20),

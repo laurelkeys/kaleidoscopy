@@ -34,18 +34,25 @@ class LLVMCodeGenerator(NodeVisitor):
         self.builder: ir.IRBuilder = None
 
         # Manages a symbol table while a function is being visited
-        self.symtab: Dict[str, ir.Value] = {}
+        # NOTE Maps variable names to values which represent its address (alloca)
+        self.symtab: Dict[str, ir.Value] = {}  # TODO replace ir.Value with ir.AllocaInstr (?)
 
     def generate_code(self, node: kal_ast.Node):
         assert isinstance(node, (kal_ast.Prototype, kal_ast.Function))
         return self._visit(node)
 
+    def __create_entry_block_alloca(self, mut_var_name: str) -> ir.AllocaInstr:
+        # Create an alloca instruction in the entry block of the current function
+        builder = ir.IRBuilder()
+        builder.position_at_start(block=self.builder.function.entry_basic_block)
+        return builder.alloca(typ=ir.DoubleType(), size=None, name=mut_var_name)
+
     def _visit_NumberExpr(self, node: kal_ast.NumberExpr) -> ir.Value:
         return ir.Constant(ir.DoubleType(), float(node.val))
 
     def _visit_VariableExpr(self, node: kal_ast.VariableExpr) -> ir.Value:
-        if (value := self.symtab.get(node.name)) is not None:
-            return value
+        if (value_addr := self.symtab.get(node.name)) is not None:
+            return self.builder.load(ptr=value_addr, name=node.name)  # load the value
         raise GenerateCodeError(f"Unknown variable name '{node.name}'")
 
     def _visit_BinaryExpr(self, node: kal_ast.BinaryExpr) -> ir.Value:
@@ -122,11 +129,22 @@ class LLVMCodeGenerator(NodeVisitor):
         return phi
 
     def _visit_ForExpr(self, node: kal_ast.ForExpr) -> ir.Value:
+        # Create an alloca for the loop (induction) variable in the entry block
+        # Save and restore location of our builder because this may modify it
+        saved_block = self.builder.block
+        loop_var_addr: ir.AllocaInstr = self.__create_entry_block_alloca(
+            mut_var_name=node.id_name
+        )
+        self.builder.position_at_end(block=saved_block)
+
         # Emit the initializer code first, without the loop variable in scope
         init_value = self._visit(node.init_expr)
 
+        # Store the value into the alloca
+        self.builder.store(value=init_value, ptr=loop_var_addr)
+
         # Make the new basic block for the loop header, inserting it after the current block
-        preheader_bb = self.builder.block
+        ## preheader_bb = self.builder.block
         loop_body_bb = ir.Block(self.builder.function, "loopbody")
         self.builder.function.basic_blocks.append(loop_body_bb)
 
@@ -136,14 +154,16 @@ class LLVMCodeGenerator(NodeVisitor):
         # Start insertion in the loop_body_bb
         self.builder.position_at_start(block=loop_body_bb)
 
-        # Start the PHI node with an entry for init_value
-        phi: ir.PhiInstr = self.builder.phi(typ=ir.DoubleType(), name=node.id_name)
-        phi.add_incoming(value=init_value, block=preheader_bb)
+        ## # Start the PHI node with an entry for init_value
+        ## phi: ir.PhiInstr = self.builder.phi(typ=ir.DoubleType(), name=node.id_name)
+        ## phi.add_incoming(value=init_value, block=preheader_bb)
 
-        # Within the loop, the variable is defined equal to the PHI node
+        # Within the loop, the loop variable is defined equal to the PHI node
         # If it shadows an existing variable, we have to restore it, so we save it now
+        ## old_value = self.symtab.get(node.id_name)
+        ## self.symtab[node.id_name] = phi
         old_value = self.symtab.get(node.id_name)
-        self.symtab[node.id_name] = phi
+        self.symtab[node.id_name] = loop_var_addr
 
         # Emit the body of the loop
         # NOTE This, like any other expr, can change the current BB
@@ -156,7 +176,7 @@ class LLVMCodeGenerator(NodeVisitor):
             else self._visit(node.step_expr)
         )
 
-        next_loop_var_value = self.builder.fadd(phi, step_value, "nextloopvar")
+        ## next_loop_var_value = self.builder.fadd(phi, step_value, "nextloopvar")
 
         # Compute the end-loop condition and convert it to a bool
         cond_value = self._visit(node.cond_expr)
@@ -164,8 +184,14 @@ class LLVMCodeGenerator(NodeVisitor):
             cmpop="!=", lhs=cond_value, rhs=ir.Constant(ir.DoubleType(), 0.0), name="loopcond"
         )
 
+        # Reload, increment, and restore the alloca
+        # NOTE This handles the case where the body of the loop mutates the variable
+        curr_loop_var_value = self.builder.load(ptr=loop_var_addr)
+        next_loop_var_value = self.builder.fadd(curr_loop_var_value, step_value, "nextloopvar")
+        self.builder.store(value=next_loop_var_value, ptr=loop_var_addr)
+
         # Create the "after loop" block ('endfor') and insert it
-        loop_end_bb = self.builder.block
+        ## loop_end_bb = self.builder.block
         after_loop_bb = ir.Block(self.builder.function, "endfor")
         self.builder.function.basic_blocks.append(after_loop_bb)
 
@@ -175,8 +201,8 @@ class LLVMCodeGenerator(NodeVisitor):
         # Any new code will be inserted in after_loop_bb
         self.builder.position_at_start(block=after_loop_bb)
 
-        # Add a new entry to the PHI node for the backedge
-        phi.add_incoming(value=next_loop_var_value, block=loop_end_bb)
+        ## # Add a new entry to the PHI node for the backedge
+        ## phi.add_incoming(value=next_loop_var_value, block=loop_end_bb)
 
         # Remove the loop variable from the symbol table
         if old_value is None:
