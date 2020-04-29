@@ -2,6 +2,7 @@ from ctypes import CFUNCTYPE, c_double
 from typing import Dict, List, Iterator, Optional
 from collections import namedtuple
 
+import llvmlite.ir as ir
 import llvmlite.binding as llvm
 
 from termcolor import colored
@@ -35,8 +36,26 @@ class KaleidoscopeCodeEvaluator:
         # llvm.initialize_native_asmparser()
 
         self.code_generator = LLVMCodeGenerator()
+        self.__add_built_ins()
 
         self.target = llvm.Target.from_default_triple()
+
+    def __add_built_ins(self):
+        # ref.: https://github.com/eliben/pykaleidoscope
+        putchar = ir.Function(
+            self.code_generator.module,
+            ftype=ir.FunctionType(return_type=ir.IntType(32), args=[ir.IntType(32)]),
+            name="putchar",
+        )
+        putchard = ir.Function(
+            self.code_generator.module,
+            ftype=ir.FunctionType(return_type=ir.DoubleType(), args=[ir.DoubleType()]),
+            name="putchard",
+        )
+        irbuilder = ir.IRBuilder(block=putchard.append_basic_block("entry"))
+        ival = irbuilder.fptoui(putchard.args[0], ir.IntType(32), "intcast")
+        irbuilder.call(fn=putchar, args=[ival])
+        irbuilder.ret(value=ir.Constant(ir.DoubleType(), 0.0))
 
     def reset(self, history: Optional[List[kal_ast.Node]] = None) -> bool:
         self.code_generator = LLVMCodeGenerator()

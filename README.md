@@ -2,36 +2,44 @@
 
 ## Grammar
 ```
-numberexpr ::= number
-
-parenexpr ::= '(' expression ')'
-
-identifierexpr
-  ::= identifier
-  ::= identifier '(' expression* ')'
-
-primary
-  ::= identifierexpr
-  ::= numberexpr
-  ::= parenexpr
-
-expression ::= primary binoprhs
-
-ifexpr ::= 'if' expression 'then' expression 'else' expression
-
-forexpr ::= 'for' identifier '=' expr ',' expr (',' expr)? 'in' expression
-
-binop ::= '<' | '+' | '-' | '*'
-
-binoprhs ::= (binop primary)*
-
-prototype ::= id '(' id* ')'
+toplevel ::= definition
+           | external
+           | toplevelexpr
+           | ';'
 
 definition ::= 'def' prototype expression
 
 external ::= 'extern' prototype
 
-top ::= definition | external | expression | ';'
+toplevelexpr ::= expression
+
+prototype ::= identifier '(' identifier* ')'
+
+expression ::= primary binoprhs
+
+binoprhs ::= (binop primary)*
+
+binop ::= '<'
+        | '+'
+        | '-'
+        | '*'
+
+primary ::= identifierexpr
+          | numberexpr
+          | parenexpr
+          | ifexpr
+          | forexpr
+
+identifierexpr ::= identifier
+                 | identifier '(' expression* ')'
+
+numberexpr ::= number
+
+parenexpr ::= '(' expression ')'
+
+ifexpr ::= 'if' expression 'then' expression 'else' expression
+
+forexpr ::= 'for' identifier '=' expr ',' expr (',' expr)? 'in' expression
 ```
 
 <!-- FIXME replace `id` by `identifier` here and in the code -->

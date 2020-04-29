@@ -34,7 +34,7 @@ class Parser:
                 yield top_level
 
     def _parse_top_level(self) -> Optional[kal_ast.Node]:
-        """ `toplevel ::= definition | external | expression | ';'` """
+        """ `toplevel ::= definition | external | toplevelexpr | ';'` """
         if self.__curr_tok_is_operator(";"):
             self.curr_tok = next(self.tokens)  # ignore top-level semicolons
             return None
@@ -97,7 +97,7 @@ class Parser:
         return kal_ast.CallExpr(id_name, args)
 
     def _parse_primary(self) -> Optional[kal_ast.Expr]:
-        """ `primary ::= identifierexpr | numberexpr | parenexpr` """
+        """ `primary ::= identifierexpr | numberexpr | parenexpr | ifexpr | forexpr` """
         if self.curr_tok.type == TokenType.IDENTIFIER:
             return self._parse_identifier_expr()
 
@@ -181,6 +181,7 @@ class Parser:
 
         if self.curr_tok.type != TokenType.IDENTIFIER:
             raise ParseError("Expected identifier after 'for'")
+
         id_name = self.curr_tok.value
         self.curr_tok = next(self.tokens)  # eat identifier
 
@@ -210,12 +211,12 @@ class Parser:
         return kal_ast.ForExpr(id_name, init_expr, cond_expr, step_expr, body_expr)
 
     def _parse_prototype(self) -> Optional[kal_ast.Prototype]:
-        """ `prototype ::= id '(' id* ')'` """
+        """ `prototype ::= identifier '(' identifier* ')'` """
         if self.curr_tok.type != TokenType.IDENTIFIER:
             raise ParseError("Expected function name in prototype")
 
         fn_name = self.curr_tok.value
-        self.curr_tok = next(self.tokens)  # eat id
+        self.curr_tok = next(self.tokens)  # eat identifier
 
         if not self.__curr_tok_is_operator("("):
             raise ParseError("Expected '(' in prototype")
@@ -225,7 +226,7 @@ class Parser:
         params: List[str] = []
         while self.curr_tok.type == TokenType.IDENTIFIER:
             params.append(self.curr_tok.value)
-            self.curr_tok = next(self.tokens)  # eat id
+            self.curr_tok = next(self.tokens)  # eat identifier
 
         if not self.__curr_tok_is_operator(")"):
             raise ParseError("Expected ')' in prototype")
