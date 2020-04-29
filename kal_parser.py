@@ -234,64 +234,11 @@ class Parser:
 
         return kal_ast.ForExpr(id_name, init_expr, cond_expr, step_expr, body_expr)
 
-    def __parse_prototype_for_user_def_bin_op(self) -> Optional[kal_ast.Prototype]:
-        raise NotImplementedError
-
-    def __parse_prototype_for_user_def_un_op(self) -> Optional[kal_ast.Prototype]:
-        raise NotImplementedError
-
-    def _parse_prototype(self) -> Optional[kal_ast.Prototype]:
-        """ `prototype ::= identifier '(' identifier* ')'
-                         | 'binary' LETTER number? '(' identifier identifier ')'
-                         | 'unary' LETTER '(' identifier ')'`
-        """
-        is_user_defined_operator = False
-
-        # FIXME
-
-        if self.curr_tok.type == TokenType.IDENTIFIER:
-            fn_name = self.curr_tok.value
-            self.curr_tok = next(self.tokens)  # eat identifier
-
-        elif self.curr_tok.type == TokenType.BINARY:
-            is_user_defined_operator = True
-
-            self.curr_tok = next(self.tokens)  # eat 'binary'
-            if self.curr_tok.type != TokenType.OPERATOR:
-                raise ParseError("Expected operator after 'binary'")
-            fn_name = f"binary{self.curr_tok.value}"
-            self.curr_tok = next(self.tokens)  # eat LETTER
-
-            # Read the precedence if present
-            if self.curr_tok.type == TokenType.NUMBER:
-                precedence = int(self.curr_tok.value)
-                if not (1 <= precedence <= 100):
-                    raise ParseError(f"Invalid precedence: {precedence} (must be 1..100)")
-                self.curr_tok = next(self.tokens)  # eat number
-            else:
-                precedence = kal_ops.DEFAULT_PRECEDENCE
-
-            operators[fn_name[-1]] = kal_ops.OperatorInfo(
-                kal_ops.Associativity.NON, precedence=precedence  # FIXME associativty
-            )
-
-        elif self.curr_tok.type == TokenType.UNARY:
-            is_user_defined_operator = True
-
-            self.curr_tok = next(self.tokens)  # eat 'unary'
-            if self.curr_tok.type != TokenType.OPERATOR:
-                raise ParseError("Expected operator after 'unary'")
-            fn_name = f"unary{self.curr_tok.value}"
-            self.curr_tok = next(self.tokens)  # eat LETTER
-
-        else:
-            raise ParseError("Expected function name in prototype")
-
+    def __parse_prototype_params(self) -> List[str]:
         if not self.__curr_tok_is_operator("("):
             raise ParseError("Expected '(' in prototype")
         self.curr_tok = next(self.tokens)  # eat '('
 
-        # Read the list of argument names
         params: List[str] = []
         while self.curr_tok.type == TokenType.IDENTIFIER:
             params.append(self.curr_tok.value)
@@ -301,19 +248,70 @@ class Parser:
             raise ParseError("Expected ')' in prototype")
         self.curr_tok = next(self.tokens)  # eat ')'
 
-        if not is_user_defined_operator:
+        return params
+
+    def _parse_prototype(self) -> Optional[kal_ast.Prototype]:
+        """ `prototype ::= identifier '(' identifier* ')'
+                         | 'binary' LETTER number? '(' identifier identifier ')'
+                         | 'unary' LETTER '(' identifier ')'`
+        """
+        if self.curr_tok.type == TokenType.IDENTIFIER:
+            fn_name = self.curr_tok.value
+            self.curr_tok = next(self.tokens)  # eat identifier
+
+            # Read the list of argument names
+            params: List[str] = self.__parse_prototype_params()
             return kal_ast.Prototype(fn_name, params)
+
+        # User-defined operators
+        elif self.curr_tok.type == TokenType.BINARY:
+            return self.__parse_prototype_for_user_def_bin_op()
+        elif self.curr_tok.type == TokenType.UNARY:
+            return self.__parse_prototype_for_user_def_un_op()
+
         else:
-            if fn_name.startswith("binary"):
-                if len(params) != 2:
-                    raise ParseError("Expected binary operator to have 2 operands")
-                return kal_ast.Prototype(fn_name, params, True, precedence)
-            elif fn_name.startswith("unary"):
-                if len(params) != 1:
-                    raise ParseError("Expected unary operator to have one operand")
-                return kal_ast.Prototype(fn_name, params, True)
-            else:
-                raise ParseError("Unexpected error")
+            raise ParseError("Expected function name in prototype")
+
+    def __parse_prototype_for_user_def_bin_op(self) -> Optional[kal_ast.Prototype]:
+        self.curr_tok = next(self.tokens)  # eat 'binary'
+        if self.curr_tok.type != TokenType.OPERATOR:
+            raise ParseError("Expected operator after 'binary'")
+        fn_name = f"binary{self.curr_tok.value}"
+        self.curr_tok = next(self.tokens)  # eat LETTER
+
+        # Read the precedence, if present
+        precedence = kal_ops.DEFAULT_PRECEDENCE
+        if self.curr_tok.type == TokenType.NUMBER:
+            precedence = int(self.curr_tok.value)
+            if not (1 <= precedence <= 100):
+                raise ParseError(f"Invalid precedence: {precedence} (must be 1..100)")
+            self.curr_tok = next(self.tokens)  # eat number
+
+        # As this is a new binary operator, install it
+        operators[fn_name[-1]] = kal_ops.OperatorInfo(
+            kal_ops.Associativity.NON, precedence  # FIXME associativty
+        )
+
+        # Read the list of argument names
+        params: List[str] = self.__parse_prototype_params()
+        if len(params) != 2:
+            raise ParseError("Expected binary operator to have two operands")
+
+        return kal_ast.Prototype(fn_name, params, is_operator=True, bin_op_precedence=precedence)
+
+    def __parse_prototype_for_user_def_un_op(self) -> Optional[kal_ast.Prototype]:
+        self.curr_tok = next(self.tokens)  # eat 'unary'
+        if self.curr_tok.type != TokenType.OPERATOR:
+            raise ParseError("Expected operator after 'unary'")
+        fn_name = f"unary{self.curr_tok.value}"
+        self.curr_tok = next(self.tokens)  # eat LETTER
+
+        # Read the list of argument names
+        params: List[str] = self.__parse_prototype_params()
+        if len(params) != 1:
+            raise ParseError("Expected unary operator to have one operand")
+
+        return kal_ast.Prototype(fn_name, params, is_operator=True)
 
     def _parse_definition(self) -> Optional[kal_ast.Function]:
         """ `definition ::= 'def' prototype expression` """

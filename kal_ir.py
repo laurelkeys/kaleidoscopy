@@ -210,6 +210,7 @@ class LLVMCodeGenerator(NodeVisitor):
             if not isinstance(fn, ir.Function):
                 raise GenerateCodeError(f"Function/global name collision '{fn_name}'")
             elif not fn.is_declaration:
+                # TODO allow function redefinition on the REPL
                 raise GenerateCodeError(f"Redefinition of '{fn_name}'")
             elif len(fn.function_type.args) != len(fn_type.args):
                 raise GenerateCodeError(f"Definition of '{fn_name}' with wrong argument count")
