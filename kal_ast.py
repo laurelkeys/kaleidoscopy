@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import List
 
+import kal_ops
+
 
 class Node:
     """ Base class for all AST nodes. """
@@ -87,9 +89,38 @@ class Prototype(Node):
         and its argument names (thus implicitly the number of arguments the function takes).
     """
 
-    def __init__(self, name: str, params: List[str]):
+    def __init__(
+        self,
+        name: str,
+        params: List[str],
+        is_operator=False,
+        bin_op_precedence=kal_ops.DEFAULT_PRECEDENCE,
+    ):
         self.name = name
         self.params = params
+        self.is_operator = is_operator
+        self.bin_op_precedence = bin_op_precedence
+        if is_operator:
+            if len(params) == 1:
+                assert self.name.startswith("unary")
+            elif len(params) == 2:
+                assert self.name.startswith("binary")
+            else:
+                assert False
+
+    def is_unary_operator(self):
+        return self.is_operator and len(self.params) == 1
+
+    def is_binary_operator(self):
+        return self.is_operator and len(self.params) == 2
+
+    def get_binary_precedence(self):
+        assert self.is_binary_operator()
+        return self.bin_op_precedence
+
+    def get_operator_name(self):
+        assert self.is_operator
+        return self.name[-1]  # NOTE only single-character user-defined operators are allowed
 
     # ref.: https://github.com/frederickjeanguerin/pykaleidoscope
 

@@ -3,6 +3,7 @@ from typing import Any, Dict
 import llvmlite.ir as ir
 
 import kal_ast
+import kal_ops
 
 
 class NodeVisitor:
@@ -63,7 +64,11 @@ class LLVMCodeGenerator(NodeVisitor):
             # Convert unsigned int 0 or 1 (bool) to double 0.0 or 1.0
             return self.builder.uitofp(fcmp, ir.DoubleType(), "booltmp")
         else:
-            raise GenerateCodeError(f"Unknown binary operator '{node.op}'")
+            if node.op not in kal_ops.operators:
+                raise GenerateCodeError(f"Unknown binary operator '{node.op}'")
+            # User-defined binary operator
+            user_def_bin_op_fn = self.module.globals[f"binary{node.op}"]
+            return self.builder.call(fn=user_def_bin_op_fn, args=[lhs, rhs], name="binop")
 
     def _visit_IfExpr(self, node: kal_ast.IfExpr) -> ir.Value:
         cond_value = self._visit(node.cond_expr)
@@ -149,9 +154,9 @@ class LLVMCodeGenerator(NodeVisitor):
             cmpop="!=", lhs=cond_value, rhs=ir.Constant(ir.DoubleType(), 0.0), name="loopcond"
         )
 
-        # Create the "after loop" block and insert it
+        # Create the "after loop" block ('endfor') and insert it
         loop_end_bb = self.builder.block
-        after_loop_bb = ir.Block(self.builder.function, "afterloop")  # TODO rename to 'endfor'
+        after_loop_bb = ir.Block(self.builder.function, "endfor")
         self.builder.function.basic_blocks.append(after_loop_bb)
 
         # Insert the conditional branch into the end of loop_end_bb

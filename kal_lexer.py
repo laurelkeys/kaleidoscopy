@@ -22,8 +22,10 @@ class TokenType(Enum):
     FOR = -9
     IN = -10
 
-    # unknown character
-    OPERATOR = -11
+    # operators
+    OPERATOR = -11  # unknown character
+    BINARY = -12
+    UNARY = -13
 
 
 Token = namedtuple(typename="Token", field_names=["type", "value"])
@@ -37,6 +39,8 @@ keywords: Dict[str, Token] = {
     "else": Token(TokenType.ELSE, value="else"),
     "for": Token(TokenType.FOR, value="for"),
     "in": Token(TokenType.IN, value="in"),
+    "binary": Token(TokenType.BINARY, value="binary"),
+    "unary": Token(TokenType.UNARY, value="unary"),
 }
 assert all([kw_key == kw.value for kw_key, kw in keywords.items()]) and (
     len([kw.type for kw in keywords.values()]) == len(set([kw.type for kw in keywords.values()]))
