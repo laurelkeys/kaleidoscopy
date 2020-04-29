@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import llvmlite.ir as ir
 
@@ -35,7 +35,7 @@ class LLVMCodeGenerator(NodeVisitor):
 
         # Manages a symbol table while a function is being visited
         # NOTE Maps variable names to values which represent its address (alloca)
-        self.symtab: Dict[str, ir.Value] = {}  # TODO replace ir.Value with ir.AllocaInstr (?)
+        self.symtab: Dict[str, ir.AllocaInstr] = {}
 
     def generate_code(self, node: kal_ast.Node):
         assert isinstance(node, (kal_ast.Prototype, kal_ast.Function))
@@ -43,9 +43,12 @@ class LLVMCodeGenerator(NodeVisitor):
 
     def __create_entry_block_alloca(self, mut_var_name: str) -> ir.AllocaInstr:
         # Create an alloca instruction in the entry block of the current function
-        builder = ir.IRBuilder()
-        builder.position_at_start(block=self.builder.function.entry_basic_block)
-        return builder.alloca(typ=ir.DoubleType(), size=None, name=mut_var_name)
+        with self.builder.goto_entry_block():
+            alloca = self.builder.alloca(typ=ir.DoubleType(), size=None, name=mut_var_name)
+        return alloca
+        ## builder = ir.IRBuilder()
+        ## builder.position_at_start(block=self.builder.function.entry_basic_block)
+        ## return builder.alloca(typ=ir.DoubleType(), size=None, name=mut_var_name)
 
     def _visit_NumberExpr(self, node: kal_ast.NumberExpr) -> ir.Value:
         return ir.Constant(ir.DoubleType(), float(node.val))
@@ -55,7 +58,19 @@ class LLVMCodeGenerator(NodeVisitor):
             return self.builder.load(ptr=value_addr, name=node.name)  # load the value
         raise GenerateCodeError(f"Unknown variable name '{node.name}'")
 
+    def __visit_BinaryExpr_for_assignment(self, node: kal_ast.BinaryExpr) -> ir.Value:
+        if not isinstance(node.lhs, kal_ast.VariableExpr):
+            raise GenerateCodeError("The LHS of the assignment operator '=' must be a variable")
+        rhs = self._visit(node.rhs)
+        lhs_addr = self.symtab[node.lhs.name]
+        self.builder.store(value=rhs, ptr=lhs_addr)
+        return rhs
+
     def _visit_BinaryExpr(self, node: kal_ast.BinaryExpr) -> ir.Value:
+        # NOTE assignment is handled as a special case
+        if node.op == "=":
+            return self.__visit_BinaryExpr_for_assignment(node)
+
         lhs = self._visit(node.lhs)
         rhs = self._visit(node.rhs)
 
@@ -120,7 +135,7 @@ class LLVMCodeGenerator(NodeVisitor):
         # update else_bb for the PHI to remember which block the 'else' ends in
         else_bb = self.builder.block
 
-        # Emit the merge ('endif') block
+        # Emit the merge ("endif") block
         self.builder.function.basic_blocks.append(merge_bb)
         self.builder.position_at_start(block=merge_bb)
         phi: ir.PhiInstr = self.builder.phi(typ=ir.DoubleType(), name="iftmp")
@@ -130,12 +145,7 @@ class LLVMCodeGenerator(NodeVisitor):
 
     def _visit_ForExpr(self, node: kal_ast.ForExpr) -> ir.Value:
         # Create an alloca for the loop (induction) variable in the entry block
-        # Save and restore location of our builder because this may modify it
-        saved_block = self.builder.block
-        loop_var_addr: ir.AllocaInstr = self.__create_entry_block_alloca(
-            mut_var_name=node.id_name
-        )
-        self.builder.position_at_end(block=saved_block)
+        loop_var_addr = self.__create_entry_block_alloca(mut_var_name=node.id_name)
 
         # Emit the initializer code first, without the loop variable in scope
         init_value = self._visit(node.init_expr)
@@ -186,11 +196,11 @@ class LLVMCodeGenerator(NodeVisitor):
 
         # Reload, increment, and restore the alloca
         # NOTE This handles the case where the body of the loop mutates the variable
-        curr_loop_var_value = self.builder.load(ptr=loop_var_addr)
+        curr_loop_var_value = self.builder.load(ptr=loop_var_addr, name=node.id_name)
         next_loop_var_value = self.builder.fadd(curr_loop_var_value, step_value, "nextloopvar")
         self.builder.store(value=next_loop_var_value, ptr=loop_var_addr)
 
-        # Create the "after loop" block ('endfor') and insert it
+        # Create the "after loop" block and insert it
         ## loop_end_bb = self.builder.block
         after_loop_bb = ir.Block(self.builder.function, "endfor")
         self.builder.function.basic_blocks.append(after_loop_bb)
@@ -212,6 +222,35 @@ class LLVMCodeGenerator(NodeVisitor):
 
         # The 'for' expression always returns 0.0
         return ir.Constant(ir.DoubleType(), 0.0)
+
+    def _visit_VarExpr(self, node: kal_ast.VarExpr) -> ir.Value:
+        old_bindings: List[ir.AllocaInstr] = []
+        for name, init in node.vars_init_list:
+            # Emit the initializer before adding the variable to scope, to
+            # prevent the initializer from referencing the variable itself
+            init_value = (
+                self._visit(init) if init is not None else ir.Constant(ir.DoubleType(), 0.0)
+            )
+
+            var_addr = self.__create_entry_block_alloca(mut_var_name=name)
+            self.builder.store(value=init_value, ptr=var_addr)
+
+            # We'll shadow this variable name in the symbol table now,
+            # so remember the old binding to restore it once we finish
+            old_bindings.append(self.symtab.get(name))
+            self.symtab[name] = var_addr
+
+        # Generate code for the body now that all vars are in scope
+        body_value = self._visit(node.body)
+
+        # Restore the old (shadowed) variables bindings
+        for i, (name, _) in enumerate(node.vars_init_list):
+            if old_bindings[i] is not None:
+                self.symtab[name] = old_bindings[i]
+            else:
+                del self.symtab[name]
+
+        return body_value
 
     def _visit_CallExpr(self, node: kal_ast.CallExpr) -> ir.Value:
         # Look up the name in the global module table
@@ -258,6 +297,18 @@ class LLVMCodeGenerator(NodeVisitor):
         # Create a new basic block to start insertion into
         bb_entry = fn.append_basic_block(name="entry")
         self.builder = ir.IRBuilder(block=bb_entry)
+
+        # Record function arguments in the symbol table
+        for i, arg in enumerate(fn.args):
+            arg.name = node.proto.params[i]
+
+            # Store the initial value for this parameter into its alloca
+            arg_addr = self.__create_entry_block_alloca(mut_var_name=arg.name)
+            self.builder.store(value=arg, ptr=arg_addr)
+
+            # Register the alloca as the memory location for the argument
+            assert arg.name not in self.symtab
+            self.symtab[arg.name] = arg_addr
 
         # Finish off the function
         fn_return_value: ir.Value = self._visit(node.body)

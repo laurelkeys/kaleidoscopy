@@ -36,6 +36,7 @@ primary ::= identifierexpr
           | parenexpr
           | ifexpr
           | forexpr
+          | varexpr
 
 identifierexpr ::= identifier
                  | identifier '(' expression* ')'

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Tuple
 
 import kal_ops
 
@@ -32,7 +32,12 @@ class NumberExpr(Expr):
         self.val = val
 
 
-# class VarExpr(Expr):
+class VarExpr(Expr):
+    """ Expression class for var/in. """
+
+    def __init__(self, vars_init_list: List[Tuple[str, Expr]], body: Expr):
+        self.vars_init_list = vars_init_list
+        self.body = body
 
 
 class VariableExpr(Expr):

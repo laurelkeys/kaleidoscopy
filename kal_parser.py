@@ -107,7 +107,8 @@ class Parser:
                        | numberexpr
                        | parenexpr
                        | ifexpr
-                       | forexpr`
+                       | forexpr
+                       | varexpr`
         """
         if self.curr_tok.type == TokenType.IDENTIFIER:
             return self._parse_identifier_expr()
@@ -123,6 +124,9 @@ class Parser:
 
         elif self.curr_tok.type == TokenType.FOR:
             return self._parse_for_expr()
+
+        elif self.curr_tok.type == TokenType.VAR:
+            return self._parse_var_expr()
 
         else:
             raise ParseError(
@@ -233,6 +237,42 @@ class Parser:
         body_expr = self._parse_expression()
 
         return kal_ast.ForExpr(id_name, init_expr, cond_expr, step_expr, body_expr)
+
+    def _parse_var_expr(self) -> Optional[kal_ast.Expr]:
+        """ `varexpr ::= 'var' identifier ('=' expression)?
+                       | (',' identifier ('=' expression)?)* 'in' expression`
+        """
+        self.curr_tok = next(self.tokens)  # eat 'var'
+
+        # At least one variable name is required
+        if self.curr_tok.type != TokenType.IDENTIFIER:
+            raise ParseError("Expected identifier after 'var'")
+
+        vars_init_list = []
+        while True:
+            var_init = None
+            var_name = self.curr_tok.value
+            self.curr_tok = next(self.tokens)  # eat identifier
+
+            # Parse the optional initializer
+            if self.__curr_tok_is_operator("="):
+                self.curr_tok = next(self.tokens)  # eat '='
+                var_init = self._parse_expression()
+
+            vars_init_list.append((var_name, var_init))
+            if not self.__curr_tok_is_operator("="):
+                break  # end of var list
+
+            self.curr_tok = next(self.tokens)  # eat ','
+            if self.curr_tok.type != TokenType.IDENTIFIER:
+                raise ParseError("Expected identifier list in 'var' after ','")
+
+        if self.curr_tok.type != TokenType.IN:
+            raise ParseError("Expected 'in' keyword after 'var'")
+        self.curr_tok = next(self.tokens)  # eat 'in'
+
+        body = self._parse_expression()
+        return kal_ast.VarExpr(vars_init_list, body)
 
     def __parse_prototype_params(self) -> List[str]:
         if not self.__curr_tok_is_operator("("):

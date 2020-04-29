@@ -148,6 +148,7 @@ class KaleidoscopeCodeEvaluator:
             pm = llvm.create_module_pass_manager()
             pmb.populate(pm)
             pm.run(llvmmod)
+            # FIXME make sure all optimizations at InitializeModuleAndPassManager() are enabled
 
             if llvmdump:
                 with open("__dump__optimized.ll", "w") as dump:
