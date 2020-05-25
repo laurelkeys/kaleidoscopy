@@ -102,7 +102,7 @@ class ForExpr(Expr):
 
 class Prototype(Node):
     """ This class represents the \"prototype\" for a function, which captures its name,
-        and its argument names (thus implicitly the number of arguments the function takes).
+        and its argument names (thus, implicitly, the number of arguments the function takes).
     """
 
     def __init__(
@@ -122,7 +122,7 @@ class Prototype(Node):
             elif len(params) == 2:
                 assert self.name.startswith("binary")
             else:
-                assert False
+                assert False, f"Invalid operator `{name}`"
 
     def is_unary_operator(self):
         return self.is_operator and len(self.params) == 1

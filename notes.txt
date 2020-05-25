@@ -51,7 +51,7 @@ For #2, you have the choice of using the techniques that we will describe for #1
 In this case, it is really easy to generate the Phi node, so we choose to do it directly.
 
 One interesting (and very important) aspect of the LLVM IR is that it requires all basic blocks to be “terminated” with a control flow instruction such as return or branch.
-This means that all control flow, including fall throughs must be made explicit in the LLVM IR.
+This means that all control flow, including fall throughs, must be made explicit in the LLVM IR.
 If you violate this rule, the verifier will emit an error.
 
 The ‘trick’ here is that while LLVM does require all register values to be in SSA form, it does not require (or permit) memory objects to be in SSA form.
