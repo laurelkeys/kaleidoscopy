@@ -14,6 +14,9 @@ class GenerateCodeError(Exception):
 ZERO = FALSE = ir.Constant(ir.DoubleType(), 0.0)
 ONE = TRUE = ir.Constant(ir.DoubleType(), 1.0)
 
+# NOTE fcmp_ordered means that neither operand can be a QNAN (quite NaN)
+# NOTE fcmp_unordered means that either operand may be a QNAN (quite NaN)
+
 
 class LLVMCodeGenerator:
     """ Node visitor class that generates LLVM IR code.
@@ -60,10 +63,12 @@ class LLVMCodeGenerator:
         elif node.op == "*":
             return self.builder.fmul(lhs, rhs, name="multmp")
         elif node.op == "<":
-            # NOTE unordered means that either operand may be a QNAN (quite NaN)
-            fcmp = self.builder.fcmp_unordered(cmpop="<", lhs=lhs, rhs=rhs, name="cmptmp")
             # Convert unsigned int 0 or 1 (bool) to double 0.0 or 1.0
-            return self.builder.uitofp(fcmp, ir.DoubleType(), "booltmp")
+            return self.builder.uitofp(
+                self.builder.fcmp_unordered("<", lhs, rhs, name="cmptmp"),
+                ir.DoubleType(),
+                name="booltmp",
+            )
         elif (user_def_bin_op_fn := self.module.globals.get(f"binary{node.op}")) is not None:
             # User-defined binary operator
             return self.builder.call(fn=user_def_bin_op_fn, args=[lhs, rhs], name="binop")
@@ -81,38 +86,35 @@ class LLVMCodeGenerator:
         raise GenerateCodeError(f"Unknown unary operator '{node.op}'")
 
     def _emit_IfExpr(self, node: kal_ast.IfExpr) -> ir.Value:
-        cond_value = self._emit(node.cond_expr)
-        # NOTE ordered means that neither operand can be a QNAN (quite NaN)
-        fcmp = self.builder.fcmp_ordered(cmpop="!=", lhs=cond_value, rhs=FALSE, name="ifcond",)
+        # Create basic blocks in the current function to express the control flow
+        then_bb = self.builder.function.append_basic_block("then")
+        else_bb = self.builder.function.append_basic_block("else")
+        merge_bb = self.builder.function.append_basic_block("endif")
 
-        # Create basic blocks to express the control flow
-        then_bb = ir.Block(self.builder.function, "then")
-        else_bb = ir.Block(self.builder.function, "else")
-        merge_bb = ir.Block(self.builder.function, "endif")
-        self.builder.cbranch(cond=fcmp, truebr=then_bb, falsebr=else_bb)
+        # Emit the comparison value and branch to either then_bb or else_bb depending on it
+        cond_value = self._emit(node.cond_expr)
+        self.builder.cbranch(
+            cond=self.builder.fcmp_ordered("!=", cond_value, FALSE, name="ifcond"),
+            truebr=then_bb,
+            falsebr=else_bb,
+        )
+
+        # NOTE Emission of then_value/else_value can modify the current basic block, so we
+        # update then_bb/else_bb for PHI to remember which block the 'then'/'else' ends in
 
         # Emit the 'then' block
-        self.builder.function.basic_blocks.append(then_bb)
         self.builder.position_at_start(block=then_bb)
         then_value = self._emit(node.then_expr)
         self.builder.branch(target=merge_bb)  # branch to 'endif' after executing 'then'
-
-        # NOTE Emission of then_value can modify the current basic block, so we
-        # update then_bb for the PHI to remember which block the 'then' ends in
         then_bb = self.builder.block
 
         # Emit the 'else' block
-        self.builder.function.basic_blocks.append(else_bb)
         self.builder.position_at_start(block=else_bb)
         else_value = self._emit(node.else_expr)
         self.builder.branch(target=merge_bb)  # branch to 'endif' after executing 'else'
-
-        # NOTE Emission of else_value can modify the current basic block, so we
-        # update else_bb for the PHI to remember which block the 'else' ends in
         else_bb = self.builder.block
 
         # Emit the merge ('endif') block
-        self.builder.function.basic_blocks.append(merge_bb)
         self.builder.position_at_start(block=merge_bb)
         phi: ir.PhiInstr = self.builder.phi(typ=ir.DoubleType(), name="iftmp")
         phi.add_incoming(value=then_value, block=then_bb)
@@ -125,8 +127,7 @@ class LLVMCodeGenerator:
 
         # Make the new basic block for the loop header, inserting it after the current block
         preheader_bb = self.builder.block
-        loop_body_bb = ir.Block(self.builder.function, "loopbody")
-        self.builder.function.basic_blocks.append(loop_body_bb)
+        loop_body_bb = self.builder.function.append_basic_block("loopbody")
 
         # Insert an explicit fall through from the current block to loop_body_bb
         self.builder.branch(target=loop_body_bb)
@@ -139,7 +140,7 @@ class LLVMCodeGenerator:
         phi.add_incoming(value=init_value, block=preheader_bb)
 
         # Within the loop, the variable is defined equal to the PHI node
-        # If it shadows an existing variable, we have to restore it, so we save it now
+        # NOTE If it shadows an existing variable, we have to restore it, so we save it now
         old_value = self.func_symtab.get(node.id_name)
         self.func_symtab[node.id_name] = phi
 
@@ -147,26 +148,23 @@ class LLVMCodeGenerator:
         # NOTE This, like any other expr, can change the current BB
         _body_value = self._emit(node.body_expr)  # NOTE we ignore the computed value
 
-        # Emit the step value
-        step_value = (
-            ONE  # if not specified, use 1.0
-            if node.step_expr is None
-            else self._emit(node.step_expr)
-        )
-
+        # Emit the step value (if not specified, use 1.0)
+        step_value = ONE if node.step_expr is None else self._emit(node.step_expr)
         next_loop_var_value = self.builder.fadd(phi, step_value, "nextloopvar")
 
-        # Compute the end-loop condition and convert it to a bool
-        cond_value = self._emit(node.cond_expr)
-        fcmp = self.builder.fcmp_ordered(cmpop="!=", lhs=cond_value, rhs=FALSE, name="loopcond")
+        # Compute the end-loop condition and convert it
+        cond_value = self.builder.fcmp_ordered(
+            "!=", self._emit(node.cond_expr), FALSE, name="loopcond"
+        )
 
         # Create the "after loop" block ('endfor') and insert it
         loop_end_bb = self.builder.block
-        after_loop_bb = ir.Block(self.builder.function, "endfor")
-        self.builder.function.basic_blocks.append(after_loop_bb)
+        after_loop_bb = self.builder.function.append_basic_block("endfor")
 
         # Insert the conditional branch into the end of loop_end_bb
-        self.builder.cbranch(cond=fcmp, truebr=loop_body_bb, falsebr=after_loop_bb)
+        self.builder.cbranch(
+            cond_value, truebr=loop_body_bb, falsebr=after_loop_bb,
+        )
 
         # Any new code will be inserted in after_loop_bb
         self.builder.position_at_start(block=after_loop_bb)
@@ -180,8 +178,7 @@ class LLVMCodeGenerator:
         else:
             self.func_symtab[node.id_name] = old_value  # restore the shadowed variable
 
-        # The 'for' expression always returns 0.0
-        return ZERO
+        return ZERO  # NOTE The 'for' expression always returns 0.0
 
     def _emit_CallExpr(self, node: kal_ast.CallExpr) -> ir.Value:
         # Look up the name in the global module table
