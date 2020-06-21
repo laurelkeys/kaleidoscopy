@@ -26,22 +26,24 @@ class Parser:
         return self.curr_tok.type == TokenType.OPERATOR and self.curr_tok.value == operator
 
     def __eat_tok(self) -> Token:
-        self.curr_tok = next(self.tokens)  # return next(self.tokens)
+        self.curr_tok = next(self.tokens)
 
     def __try_eat_tok(
         self, expected_type: TokenType, expected_value: Optional[str] = None
     ) -> Token:
         if expected_type != self.curr_tok.type:
             raise ParseError(f"Expected '{expected_type}'")
+
         elif expected_type == TokenType.OPERATOR or expected_value is not None:
             if self.curr_tok.value != expected_value:
                 raise ParseError(f"Expected '{expected_value}' but got '{self.curr_tok.value}'")
-        self.__eat_tok()  # return self.__eat_tok()
+
+        self.__eat_tok()
 
     def parse(self, source_code: str) -> Iterator[Optional[kal_ast.Node]]:
         """ Returns the nodes of the AST representation of `source_code`. """
         self.tokens = Lexer(source_code).tokens()
-        self.curr_tok = next(self.tokens)
+        self.__eat_tok()
 
         while self.curr_tok.type != TokenType.EOF:
             if (top_level := self._parse_top_level()) is not None:
@@ -54,7 +56,7 @@ class Parser:
                         | ';'`
         """
         if self.__curr_tok_is_operator(";"):
-            self.curr_tok = next(self.tokens)  # ignore top-level semicolons
+            self.__eat_tok()  # ignore top-level semicolons
             return None
 
         elif self.curr_tok.type == TokenType.DEF:
@@ -76,12 +78,7 @@ class Parser:
         """ `parenexpr ::= '(' expression ')'` """
         self.__eat_tok()  # '('
         expr = self._parse_expression()
-        self.__try_eat_tok(TokenType.OPERATOR, expected_value=")")
-        ## if not expr:
-        ##     return None
-        ## elif not self.__curr_tok_is_operator(")"):
-        ##     raise ParseError("Expected ')'")
-        ## self.__eat_tok()  # ')'
+        self.__try_eat_tok(TokenType.OPERATOR, expected_value=")")  # ')'
         return expr
 
     def _parse_identifier_expr(self) -> Optional[kal_ast.Expr]:
@@ -103,10 +100,7 @@ class Parser:
                 args.append(self._parse_expression())
                 if self.__curr_tok_is_operator(")"):
                     break
-                self.__try_eat_tok(TokenType.OPERATOR, expected_value=",")
-                ## if not self.__curr_tok_is_operator(","):
-                ##     raise ParseError("Expected ')' or ',' in argument list")
-                ## self.__eat_tok()  # ','
+                self.__try_eat_tok(TokenType.OPERATOR, expected_value=",")  # ','
 
         self.__eat_tok()  # ')'
         return kal_ast.CallExpr(id_name, args)
@@ -196,16 +190,10 @@ class Parser:
 
         cond_expr = self._parse_expression()
 
-        self.__try_eat_tok(TokenType.THEN, expected_value="then")
-        ## if self.curr_tok.type != TokenType.THEN:
-        ##     raise ParseError("Expected 'then'")
-        ## self.__eat_tok()  # 'then'
+        self.__try_eat_tok(TokenType.THEN, expected_value="then")  # 'then'
         then_expr = self._parse_expression()
 
-        self.__try_eat_tok(TokenType.ELSE, expected_value="else")
-        ## if self.curr_tok.type != TokenType.ELSE:
-        ##     raise ParseError("Expected 'else'")
-        ## self.__eat_tok()  # 'else'
+        self.__try_eat_tok(TokenType.ELSE, expected_value="else")  # 'else'
         else_expr = self._parse_expression()
 
         return kal_ast.IfExpr(cond_expr, then_expr, else_expr)
@@ -216,21 +204,12 @@ class Parser:
 
         id_name = self.curr_tok.value
         self.__try_eat_tok(TokenType.IDENTIFIER)  # identifier
-        ## if self.curr_tok.type != TokenType.IDENTIFIER:
-        ##     raise ParseError("Expected identifier after 'for'")
-        ## self.__eat_tok()  # identifier
 
-        self.__try_eat_tok(TokenType.OPERATOR, expected_value="=")
-        ## if not self.__curr_tok_is_operator("="):
-        ##     raise ParseError("Expected '=' after 'for'")
-        ## self.__eat_tok()  # '='
+        self.__try_eat_tok(TokenType.OPERATOR, expected_value="=")  # '='
 
         init_expr = self._parse_expression()
 
-        self.__try_eat_tok(TokenType.OPERATOR, expected_value=",")
-        ## if not self.__curr_tok_is_operator(","):
-        ##     raise ParseError("Expected ',' after 'for' init value")
-        ## self.__eat_tok()  # ','
+        self.__try_eat_tok(TokenType.OPERATOR, expected_value=",")  # ','
 
         cond_expr = self._parse_expression()
 
@@ -240,29 +219,20 @@ class Parser:
             step_expr = self._parse_expression()
 
         self.__try_eat_tok(TokenType.IN)  # 'in'
-        ## if self.curr_tok.type != TokenType.IN:
-        ##     raise ParseError("Expected 'in' after 'for'")
-        ## self.__eat_tok()  # 'in'
 
         body_expr = self._parse_expression()
 
         return kal_ast.ForExpr(id_name, init_expr, cond_expr, step_expr, body_expr)
 
     def __parse_prototype_params(self) -> List[str]:
-        self.__try_eat_tok(TokenType.OPERATOR, expected_value="(")
-        ## if not self.__curr_tok_is_operator("("):
-        ##     raise ParseError("Expected '(' in prototype")
-        ## self.__eat_tok()  # '('
+        self.__try_eat_tok(TokenType.OPERATOR, expected_value="(")  # '('
 
         params: List[str] = []
         while self.curr_tok.type == TokenType.IDENTIFIER:
             params.append(self.curr_tok.value)
             self.__eat_tok()  # identifier
 
-        self.__try_eat_tok(TokenType.OPERATOR, expected_value=")")
-        ## if not self.__curr_tok_is_operator(")"):
-        ##     raise ParseError("Expected ')' in prototype")
-        ## self.__eat_tok()  # ')'
+        self.__try_eat_tok(TokenType.OPERATOR, expected_value=")")  # ')'
 
         return params
 

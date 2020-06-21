@@ -42,9 +42,8 @@ keywords: Dict[str, Token] = {
     "binary": Token(TokenType.BINARY, value="binary"),
     "unary": Token(TokenType.UNARY, value="unary"),
 }
-assert all([kw_key == kw.value for kw_key, kw in keywords.items()]) and (
-    len(kw_types := [kw.type for kw in keywords.values()]) == len(set(kw_types))
-)
+assert all([kw_key == kw.value for kw_key, kw in keywords.items()])
+assert len(kw_types := [kw.type for kw in keywords.values()]) == len(set(kw_types))
 
 
 class Lexer:
