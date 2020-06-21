@@ -125,9 +125,7 @@ class KaleidoscopeCodeEvaluator:
         if llvmdump:
             with open("__dump__unoptimized.ll", "w") as dump:
                 dump.write(str(self.code_generator.module))
-                print(
-                    colored(f"Unoptimized LLVM IR code dumped to '{dump.name}'", color="yellow",)
-                )
+                print(colored(f"Unoptimized LLVM IR code dumped to '{dump.name}'", color="yellow",))
 
         # If we're evaluating an anonymous wrapper for a top-level expression,
         # JIT-compile the module and run the function to get its result
@@ -152,11 +150,7 @@ class KaleidoscopeCodeEvaluator:
             if llvmdump:
                 with open("__dump__optimized.ll", "w") as dump:
                     dump.write(str(llvmmod))
-                    print(
-                        colored(
-                            f"Optimized LLVM IR code dumped to '{dump.name}'", color="yellow",
-                        )
-                    )
+                    print(colored(f"Optimized LLVM IR code dumped to '{dump.name}'", color="yellow",))
 
         opt_ir = None
         if verbose:

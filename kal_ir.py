@@ -20,6 +20,10 @@ class GenerateCodeError(Exception):
     pass
 
 
+ZERO = FALSE = ir.Constant(ir.DoubleType(), 0.0)
+ONE = TRUE = ir.Constant(ir.DoubleType(), 1.0)
+
+
 class LLVMCodeGenerator(NodeVisitor):
     """ Node visitor class that generates LLVM IR code.
 
@@ -63,29 +67,26 @@ class LLVMCodeGenerator(NodeVisitor):
             fcmp = self.builder.fcmp_unordered(cmpop="<", lhs=lhs, rhs=rhs, name="cmptmp")
             # Convert unsigned int 0 or 1 (bool) to double 0.0 or 1.0
             return self.builder.uitofp(fcmp, ir.DoubleType(), "booltmp")
-        elif node.op not in kal_ops.operators:
-            raise GenerateCodeError(f"Unknown binary operator '{node.op}'")
-        else:
+        elif (user_def_bin_op_fn := self.module.globals.get(f"binary{node.op}")) is not None:
             # User-defined binary operator
-            user_def_bin_op_fn = self.module.globals[f"binary{node.op}"]
             return self.builder.call(fn=user_def_bin_op_fn, args=[lhs, rhs], name="binop")
+
+        raise GenerateCodeError(f"Unknown binary operator '{node.op}'")
 
     def _visit_UnaryExpr(self, node: kal_ast.UnaryExpr) -> ir.Value:
         operand = self._visit(node.operand)
 
-        # NOTE There are no pre-defined unary opeartors (unlike with binary operators)
-
-        # User-defined unary operator
+        # NOTE There are no pre-defined unary operators (unlike with binary operators)
         if (user_def_un_op_fn := self.module.globals.get(f"unary{node.op}")) is not None:
+            # User-defined unary operator
             return self.builder.call(fn=user_def_un_op_fn, args=[operand], name="unop")
+
         raise GenerateCodeError(f"Unknown unary operator '{node.op}'")
 
     def _visit_IfExpr(self, node: kal_ast.IfExpr) -> ir.Value:
         cond_value = self._visit(node.cond_expr)
         # NOTE ordered means that neither operand can be a QNAN (quite NaN)
-        fcmp = self.builder.fcmp_ordered(
-            cmpop="!=", lhs=cond_value, rhs=ir.Constant(ir.DoubleType(), 0.0), name="ifcond",
-        )
+        fcmp = self.builder.fcmp_ordered(cmpop="!=", lhs=cond_value, rhs=FALSE, name="ifcond",)
 
         # Create basic blocks to express the control flow
         then_bb = ir.Block(self.builder.function, "then")
@@ -151,7 +152,7 @@ class LLVMCodeGenerator(NodeVisitor):
 
         # Emit the step value
         step_value = (
-            ir.Constant(ir.DoubleType(), 1.0)  # if not specified, use 1.0
+            ONE  # if not specified, use 1.0
             if node.step_expr is None
             else self._visit(node.step_expr)
         )
@@ -160,9 +161,7 @@ class LLVMCodeGenerator(NodeVisitor):
 
         # Compute the end-loop condition and convert it to a bool
         cond_value = self._visit(node.cond_expr)
-        fcmp = self.builder.fcmp_ordered(
-            cmpop="!=", lhs=cond_value, rhs=ir.Constant(ir.DoubleType(), 0.0), name="loopcond"
-        )
+        fcmp = self.builder.fcmp_ordered(cmpop="!=", lhs=cond_value, rhs=FALSE, name="loopcond")
 
         # Create the "after loop" block ('endfor') and insert it
         loop_end_bb = self.builder.block
@@ -185,7 +184,7 @@ class LLVMCodeGenerator(NodeVisitor):
             self.symtab[node.id_name] = old_value  # restore the shadowed variable
 
         # The 'for' expression always returns 0.0
-        return ir.Constant(ir.DoubleType(), 0.0)
+        return ZERO
 
     def _visit_CallExpr(self, node: kal_ast.CallExpr) -> ir.Value:
         # Look up the name in the global module table
