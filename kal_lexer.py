@@ -43,7 +43,7 @@ keywords: Dict[str, Token] = {
     "unary": Token(TokenType.UNARY, value="unary"),
 }
 assert all([kw_key == kw.value for kw_key, kw in keywords.items()]) and (
-    len([kw.type for kw in keywords.values()]) == len(set([kw.type for kw in keywords.values()]))
+    len(kw_types := [kw.type for kw in keywords.values()]) == len(set(kw_types))
 )
 
 

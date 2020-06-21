@@ -55,6 +55,29 @@ def test_nested_if():
     assert e.evaluate("foo(100, 2000, 30)") == 60
 
 
+def test_nested_if2():
+    e = KaleidoscopeCodeEvaluator()
+    e.evaluate(
+        """
+        def min3(a b c)
+            if a < b
+                then if a < c
+                    then a
+                    else c
+                else if b < c
+                    then b
+                    else c"""
+    )
+    assert e.evaluate("min3(1, 2, 3)") == 1
+    assert e.evaluate("min3(1, 3, 2)") == 1
+    assert e.evaluate("min3(2, 1, 3)") == 1
+    assert e.evaluate("min3(2, 3, 1)") == 1
+    assert e.evaluate("min3(3, 1, 2)") == 1
+    assert e.evaluate("min3(3, 2, 1)") == 1
+    assert e.evaluate("min3(3, 3, 2)") == 2
+    assert e.evaluate("min3(3, 3, 3)") == 3
+
+
 def test_for():
     e = KaleidoscopeCodeEvaluator()
     e.evaluate(
