@@ -240,7 +240,7 @@ class LLVMCodeGenerator:
 
         # Add the function arguments to the symbol table and create their allocas
         for arg in fn.args:
-            arg_addr = self.__alloca(var_name=arg.name, fn=fn)  # FIXME test removing fn
+            arg_addr = self.builder.alloca(ir.DoubleType(), name=arg.name)
             self.builder.store(value=arg, ptr=arg_addr)
             assert arg.name not in self.func_symtab
             self.func_symtab[arg.name] = arg_addr
