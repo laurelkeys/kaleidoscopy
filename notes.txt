@@ -53,3 +53,13 @@ In this case, it is really easy to generate the Phi node, so we choose to do it 
 One interesting (and very important) aspect of the LLVM IR is that it requires all basic blocks to be “terminated” with a control flow instruction such as return or branch.
 This means that all control flow, including fall throughs must be made explicit in the LLVM IR.
 If you violate this rule, the verifier will emit an error.
+
+The ‘trick’ here is that while LLVM does require all register values to be in SSA form, it does not require (or permit) memory objects to be in SSA form.
+In LLVM, instead of encoding dataflow analysis of memory into the LLVM IR, it is handled with Analysis Passes which are computed on demand.
+With this in mind, the high-level idea is that we want to make a stack variable (which lives in memory, because it is on the stack) for each mutable object in a function.
+
+In LLVM, all memory accesses are explicit with load/store instructions, and it is carefully designed not to have (or need) an “address-of” operator.
+
+[[...]] the type of the @G/@H global variables is actually “i32*” even though the variable is defined as “i32”.
+What this means is that @G defines space for an i32 in the global data area, but its name actually refers to the address for that space.
+Stack variables work the same way, except that instead of being declared with global variable definitions, they are declared with the LLVM alloca instruction.
