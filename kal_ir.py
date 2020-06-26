@@ -31,12 +31,24 @@ class LLVMCodeGenerator:
         # Current IR builder
         self.builder: ir.IRBuilder = None
 
-        # Manages a symbol table while a function is being visited
-        self.func_symtab: Dict[str, ir.Value] = {}
+        # Manages a symbol table while a function is being code generated
+        # Maps var names to its address (alloca), represented by an ir.Value
+        self.func_symtab: Dict[str, ir.Value] = {}  # TODO replace with ir.AllocaInstr
 
     def generate_code(self, node: kal_ast.Node):
         assert isinstance(node, (kal_ast.Prototype, kal_ast.Function))
         return self._emit(node)
+
+    def __alloca(self, var_name: str, fn: ir.Function = None):
+        """ Create an alloca instruction in the entry block of `fn`.
+
+            Note: If `fn is None`, the current function is used.
+        """
+        if fn is None:
+            fn = self.builder.function
+        builder = ir.IRBuilder()
+        builder.position_at_start(block=fn.entry_basic_block)
+        return builder.alloca(typ=ir.DoubleType(), size=None, name=var_name)
 
     def _emit(self, node: kal_ast.Node) -> Any:
         """ Visit an AST node and emit its corresponding LLVM IR. """
@@ -48,8 +60,9 @@ class LLVMCodeGenerator:
         return ir.Constant(ir.DoubleType(), float(node.val))
 
     def _emit_VariableExpr(self, node: kal_ast.VariableExpr) -> ir.Value:
-        if (value := self.func_symtab.get(node.name)) is not None:
-            return value
+        if (var_addr := self.func_symtab.get(node.name)) is not None:
+            return self.builder.load(ptr=var_addr, name=node.name)
+
         raise GenerateCodeError(f"Unknown variable name '{node.name}'")
 
     def _emit_BinaryExpr(self, node: kal_ast.BinaryExpr) -> ir.Value:
@@ -122,6 +135,33 @@ class LLVMCodeGenerator:
         return phi
 
     def _emit_ForExpr(self, node: kal_ast.ForExpr) -> ir.Value:
+        # XXX https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl07.html#adjusting-existing-variables-for-mutation
+
+        # Create an alloca for the variable in the entry block
+        saved_block = self.builder.block
+        loop_var_addr = self.__alloca(var_name=node.id_name)
+        self.builder.position_at_end(saved_block)
+
+        # Emit the initializer code first, without the loop variable in scope
+        init_value = self._emit(node.init_expr)
+
+        # Store the value into the alloca
+        self.builder.store(value=init_value, ptr=loop_var_addr)
+
+        # ...
+
+        # Compute the end-loop condition and convert it
+        cond_value = self.builder.fcmp_ordered(
+            "!=", self._emit(node.cond_expr), FALSE, name="loopcond"
+        )
+
+        # Reload, increment, and restore the alloca
+        # This handles the case where the body of the loop mutates the variable
+        curr_loop_var_value = self.builder.load(ptr=loop_var_addr)
+        next_loop_var_value = self.builder.fadd(curr_loop_var_value, step_value, name="nextloopvar")
+        self.builder.store(value=next_loop_var_value, ptr=loop_var_addr)
+
+        """
         # Emit the initializer code first, without the loop variable in scope
         init_value = self._emit(node.init_expr)
 
@@ -177,7 +217,7 @@ class LLVMCodeGenerator:
             del self.func_symtab[node.id_name]
         else:
             self.func_symtab[node.id_name] = old_value  # restore the shadowed variable
-
+        """
         return ZERO  # NOTE The 'for' expression always returns 0.0
 
     def _emit_CallExpr(self, node: kal_ast.CallExpr) -> ir.Value:
