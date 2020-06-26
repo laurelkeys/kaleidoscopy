@@ -214,11 +214,10 @@ class LLVMCodeGenerator:
         )
 
         if (fn := self.module.globals.get(fn_name)) is None:
-            # Create a new function and set its arguments names
+            # Create a new function and name its arguments
             fn = ir.Function(module=self.module, ftype=fn_type, name=fn_name)
             for arg, arg_name in zip(fn.args, node.params):
                 arg.name = arg_name
-                self.func_symtab[arg.name] = arg
 
         elif not isinstance(fn, ir.Function):
             raise GenerateCodeError(f"Function/global name collision '{fn_name}'")
@@ -230,14 +229,21 @@ class LLVMCodeGenerator:
         return fn
 
     def _emit_Function(self, node: kal_ast.Function) -> ir.Value:
-        # Reset the symbol table and create the function skeleton from the prototype
-        # NOTE prototype generation will pre-populate func_symtab with function arguments
+        # Reset func_symtab and create the function skeleton from the prototype
+        # NOTE prototype generation pre-populates the symbol table with arguments
         self.func_symtab = {}
         fn: ir.Function = self._emit(node.proto)
 
         # Create a new basic block to start insertion into
         bb_entry = fn.append_basic_block(name="entry")
         self.builder = ir.IRBuilder(block=bb_entry)
+
+        # Add the function arguments to the symbol table and create their allocas
+        for arg in fn.args:
+            arg_addr = self.__alloca(var_name=arg.name, fn=fn)  # FIXME test removing fn
+            self.builder.store(value=arg, ptr=arg_addr)
+            assert arg.name not in self.func_symtab
+            self.func_symtab[arg.name] = arg_addr
 
         # Finish off the function
         fn_return_value: ir.Value = self._emit(node.body)
