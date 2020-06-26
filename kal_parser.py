@@ -152,7 +152,7 @@ class Parser:
 
             # If bin_op binds less tightly with RHS than the operator
             # after RHS, let the pending operator take RHS as its LHS
-            if curr_prec < (next_prec := self.__curr_tok_precedence()):
+            if curr_prec < (_next_prec := self.__curr_tok_precedence()):
                 rhs = self._parse_bin_op_rhs(curr_prec + 1, rhs)
 
             # Merge LHS/RHS

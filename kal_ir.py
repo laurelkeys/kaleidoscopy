@@ -61,6 +61,17 @@ class LLVMCodeGenerator:
         raise GenerateCodeError(f"Unknown variable name '{node.name}'")
 
     def _emit_BinaryExpr(self, node: kal_ast.BinaryExpr) -> ir.Value:
+        # Assignment is handled as a special case
+        if node.op == "=":
+            if not isinstance(node.lhs, kal_ast.VariableExpr):
+                raise GenerateCodeError(f"The LHS of '=' must be a variable")
+
+            lhs_addr = self.func_symtab[node.lhs.name]
+            rhs_value = self._emit(node.rhs)
+            self.builder.store(value=rhs_value, ptr=lhs_addr)
+
+            return rhs_value
+
         lhs = self._emit(node.lhs)
         rhs = self._emit(node.rhs)
 
