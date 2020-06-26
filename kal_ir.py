@@ -86,7 +86,7 @@ class LLVMCodeGenerator:
     def _emit_UnaryExpr(self, node: kal_ast.UnaryExpr) -> ir.Value:
         operand = self._emit(node.operand)
 
-        # NOTE There are no pre-defined unary operators (unlike with binary operators)
+        # NOTE there are no pre-defined unary operators (unlike with binary operators)
         if (user_def_un_op_fn := self.module.globals.get(f"unary{node.op}")) is not None:
             # User-defined unary operator
             return self.builder.call(fn=user_def_un_op_fn, args=[operand], name="unop")
@@ -107,7 +107,7 @@ class LLVMCodeGenerator:
             falsebr=else_bb,
         )
 
-        # NOTE Emission of then_value/else_value can modify the current basic block, so we
+        # NOTE emission of then_value/else_value can modify the current basic block, so we
         # update then_bb/else_bb for PHI to remember which block the 'then'/'else' ends in
 
         # Emit the 'then' block
@@ -145,12 +145,12 @@ class LLVMCodeGenerator:
         self.builder.position_at_start(block=loop_body_bb)
 
         # Within the loop, the variable refers to the stack slot allocated with alloca
-        # NOTE If it shadows an existing variable, we have to restore it, so we save it now
+        # NOTE if it shadows an existing variable, we have to restore it, so we save it now
         old_var_addr = self.func_symtab.get(node.id_name)
         self.func_symtab[node.id_name] = var_addr
 
         # Emit the body of the loop
-        # NOTE This, like any other expr, can change the current BB
+        # NOTE this, like any other expr, can change the current BB
         _body_value = self._emit(node.body_expr)  # NOTE we ignore the computed value
 
         # Compute the end-loop condition and convert it
@@ -184,7 +184,7 @@ class LLVMCodeGenerator:
         else:
             self.func_symtab[node.id_name] = old_var_addr  # restore the shadowed variable
 
-        return ZERO  # NOTE The 'for' expression always returns 0.0
+        return ZERO  # NOTE the 'for' expression always returns 0.0
 
     def _emit_CallExpr(self, node: kal_ast.CallExpr) -> ir.Value:
         # Look up the name in the global module table

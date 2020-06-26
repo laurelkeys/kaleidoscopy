@@ -129,7 +129,7 @@ class Parser:
     def _parse_expression(self) -> Optional[kal_ast.Expr]:
         """ `expression ::= unary binoprhs` """
         lhs = self._parse_unary()
-        # NOTE Start with precedence 0 because we want to
+        # NOTE start with precedence 0, because we want to
         # bind any operator to the expression at this point
         return self._parse_bin_op_rhs(expr_prec=0, lhs=lhs)
 
@@ -142,7 +142,7 @@ class Parser:
             # If this is a binary operator that binds at least as tightly as the
             # currently parsed sub-expression, consume it, otherwise we are done
             if (curr_prec := self.__curr_tok_precedence()) < expr_prec:
-                # NOTE The precedence of non-operators is defined to be -1,
+                # NOTE the precedence of non-operators is defined to be -1,
                 # so this condition handles cases when the expression has ended
                 return lhs
 

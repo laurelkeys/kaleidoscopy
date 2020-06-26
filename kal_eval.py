@@ -17,7 +17,7 @@ from kal_parser import Parser
 
 
 EvalResult = namedtuple(
-    typename="EvalResult", field_names=["value", "ast", "unoptimized_ir", "optimized_ir"],
+    typename="EvalResult", field_names=["ast", "unoptimized_ir", "optimized_ir", "value"],
 )
 
 
@@ -66,6 +66,12 @@ class KaleidoscopeCodeEvaluator:
         """
         # ref.: https://github.com/frederickjeanguerin/pykaleidoscope
         return str(self.code_generator.module).split("\n\n")[index]
+
+    def __dump(self, text, into, and_log=None):
+        """ Create a file named `into` and dump `text` into it. """
+        with open(into, "w") as dump:
+            dump.write(str(text))
+            print(colored(f"{and_log} dumped to '{dump.name}'", color="yellow"))
 
     def reset(self, history: Optional[List[kal_ast.Node]] = None) -> bool:
         self.code_generator = LLVMCodeGenerator()
@@ -116,26 +122,27 @@ class KaleidoscopeCodeEvaluator:
         raw_ir = None
         opt_ir = None
         if parseonly:
-            return EvalResult(value=str(ast), ast=ast, unoptimized_ir=raw_ir, optimized_ir=opt_ir)
+            return EvalResult(ast, raw_ir, opt_ir, value=str(ast))
 
         # Generate LLVM IR from the AST representation of the code
         self.code_generator.generate_code(ast)
-
         raw_ir = self.__last_ir()
 
-        if noexec:
-            return EvalResult(value=raw_ir, ast=ast, unoptimized_ir=raw_ir, optimized_ir=opt_ir)
-
         if llvmdump:
-            with open("__dump__unoptimized.ll", "w") as dump:
-                dump.write(str(self.code_generator.module))
-                print(colored(f"Unoptimized LLVM IR code dumped to '{dump.name}'", color="yellow"))
+            self.__dump(
+                self.code_generator.module,
+                into="__dump__unoptimized.ll",
+                and_log="Unoptimized LLVM IR code",
+            )
+
+        if noexec:
+            return EvalResult(ast, raw_ir, opt_ir, value=raw_ir)
 
         # If we're evaluating a definition or extern declaration, don't do anything else
         # If it's an anonymous wrapper, JIT-compile the module and run the function to get its result
         is_def_or_extern = not (isinstance(ast, kal_ast.Function) and ast.is_anonymous())
         if is_def_or_extern and not optimize:
-            return EvalResult(value=None, ast=ast, unoptimized_ir=raw_ir, optimized_ir=opt_ir)
+            return EvalResult(ast, raw_ir, opt_ir, value=None)
 
         # Convert LLVM IR into in-memory representation and verify the code
         llvmmod: llvm.ModuleRef = llvm.parse_assembly(str(self.code_generator.module))
@@ -145,20 +152,22 @@ class KaleidoscopeCodeEvaluator:
         if optimize:
             pmb = llvm.create_pass_manager_builder()
             pm = llvm.create_module_pass_manager()
+
             pmb.opt_level = 2
             pmb.populate(pm)
             pm.run(llvmmod)
 
             if llvmdump:
-                with open("__dump__optimized.ll", "w") as dump:
-                    dump.write(str(llvmmod))
-                    print(colored(f"Optimized LLVM IR code dumped to '{dump.name}'", color="yellow"))
+                self.__dump(
+                    llvmmod, into="__dump__optimized.ll", and_log="Optimized LLVM IR code",
+                )
 
-        opt_ir = self.__last_ir(index=-2)
+            opt_ir = self.__last_ir(index=-2)
 
         if is_def_or_extern:
-            return EvalResult(value=None, ast=ast, unoptimized_ir=raw_ir, optimized_ir=opt_ir)
+            return EvalResult(ast, raw_ir, opt_ir, value=None)
 
+        # Create a MCJIT execution engine to JIT-compile the module
         # NOTE a execution_engine takes ownership of target_machine, so it
         # has to be recreated anew each time we call create_mcjit_compiler
         target_machine = self.target.create_target_machine()
@@ -166,11 +175,13 @@ class KaleidoscopeCodeEvaluator:
             execution_engine.finalize_object()
 
             if llvmdump:
-                with open("__dump__assembler.asm", "w") as dump:
-                    dump.write(target_machine.emit_assembly(llvmmod))
-                    print(colored(f"Machine code dumped to '{dump.name}'", color="yellow"))
+                self.__dump(
+                    target_machine.emit_assembly(llvmmod),
+                    into="__dump__assembler.asm",
+                    and_log="Machine code",
+                )
 
             fn_ptr = CFUNCTYPE(c_double)(execution_engine.get_function_address(ast.proto.name))
             result = fn_ptr()
 
-            return EvalResult(value=result, ast=ast, unoptimized_ir=raw_ir, optimized_ir=opt_ir)
+            return EvalResult(ast, raw_ir, opt_ir, value=result)
