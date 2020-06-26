@@ -32,14 +32,14 @@ class LLVMCodeGenerator:
         self.builder: ir.IRBuilder = None
 
         # Manages a symbol table while a function is being code generated
-        # Maps var names to its address (alloca), represented by an ir.Value
-        self.func_symtab: Dict[str, ir.Value] = {}  # TODO replace with ir.AllocaInstr
+        # Maps var names to its address slot (allocated on the stack with alloca)
+        self.func_symtab: Dict[str, ir.AllocaInstr] = {}
 
     def generate_code(self, node: kal_ast.Node):
         assert isinstance(node, (kal_ast.Prototype, kal_ast.Function))
         return self._emit(node)
 
-    def __alloca(self, var_name: str):
+    def __alloca(self, var_name: str) -> ir.AllocaInstr:
         """ Create an alloca instruction in the entry block of the current function. """
         with self.builder.goto_entry_block():
             var_addr = self.builder.alloca(typ=ir.DoubleType(), size=None, name=var_name)

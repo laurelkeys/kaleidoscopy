@@ -36,6 +36,10 @@ if __name__ == "__main__":
     else:
         try:
             with open(sys.argv[1]) as kal_file:
-                kal_repl.print_eval(kal_eval.KaleidoscopeCodeEvaluator(), kal_file.read(), {})
+                kal_repl.print_eval(
+                    kal_eval.KaleidoscopeCodeEvaluator(),
+                    kal_file.read(),
+                    {"optimize": True, "llvmdump": True, "verbose": False},
+                )
         except FileNotFoundError:
             kal_repl.errprint(f"File not found: '{sys.argv[1]}'")
