@@ -39,16 +39,11 @@ class LLVMCodeGenerator:
         assert isinstance(node, (kal_ast.Prototype, kal_ast.Function))
         return self._emit(node)
 
-    def __alloca(self, var_name: str, fn: ir.Function = None):
-        """ Create an alloca instruction in the entry block of `fn`.
-
-            Note: If `fn is None`, the current function is used.
-        """
-        if fn is None:
-            fn = self.builder.function
-        builder = ir.IRBuilder()
-        builder.position_at_start(block=fn.entry_basic_block)
-        return builder.alloca(typ=ir.DoubleType(), size=None, name=var_name)
+    def __alloca(self, var_name: str):
+        """ Create an alloca instruction in the entry block of the current function. """
+        with self.builder.goto_entry_block():
+            var_addr = self.builder.alloca(typ=ir.DoubleType(), size=None, name=var_name)
+        return var_addr
 
     def _emit(self, node: kal_ast.Node) -> Any:
         """ Visit an AST node and emit its corresponding LLVM IR. """
@@ -136,10 +131,7 @@ class LLVMCodeGenerator:
 
     def _emit_ForExpr(self, node: kal_ast.ForExpr) -> ir.Value:
         # Create an alloca for the induction variable in the entry block of the current function
-        # NOTE Calling __alloca may modify the location of our builder, so we save and restore it
-        saved_block = self.builder.block
         var_addr = self.__alloca(var_name=node.id_name)
-        self.builder.position_at_end(saved_block)
 
         # Emit the initializer code first, without the loop variable in scope, and store its value in the alloca
         init_value = self._emit(node.init_expr)
@@ -240,7 +232,7 @@ class LLVMCodeGenerator:
 
         # Add the function arguments to the symbol table and create their allocas
         for arg in fn.args:
-            arg_addr = self.builder.alloca(ir.DoubleType(), name=arg.name)
+            arg_addr = self.__alloca(var_name=arg.name)
             self.builder.store(value=arg, ptr=arg_addr)
             assert arg.name not in self.func_symtab
             self.func_symtab[arg.name] = arg_addr
