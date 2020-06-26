@@ -126,14 +126,8 @@ class KaleidoscopeCodeEvaluator:
 
         # Generate LLVM IR from the AST representation of the code
         self.code_generator.generate_code(ast)
-        raw_ir = self.__last_ir()
 
-        if llvmdump:
-            self.__dump(
-                self.code_generator.module,
-                into="__dump__unoptimized.ll",
-                and_log="Unoptimized LLVM IR code",
-            )
+        raw_ir = self.__last_ir()
 
         if noexec:
             return EvalResult(ast, raw_ir, opt_ir, value=raw_ir)
@@ -147,6 +141,11 @@ class KaleidoscopeCodeEvaluator:
         # Convert LLVM IR into in-memory representation and verify the code
         llvmmod: llvm.ModuleRef = llvm.parse_assembly(str(self.code_generator.module))
         llvmmod.verify()
+
+        if llvmdump:
+            self.__dump(
+                llvmmod, into="__dump__unoptimized.ll", and_log="Unoptimized LLVM IR code",
+            )
 
         # Run module optimization passes
         if optimize:
