@@ -4,7 +4,7 @@ import kal_ast
 import kal_ops
 import kal_lexer
 
-from kal_ops import operators, get_precedence
+from kal_ops import Associativity, operators, get_precedence, get_associativity
 from kal_lexer import Lexer, Token, TokenType
 
 
@@ -21,6 +21,9 @@ class Parser:
 
     def __curr_tok_precedence(self) -> int:
         return get_precedence(op=self.curr_tok.value)
+
+    def __curr_tok_associativity(self) -> int:
+        return get_associativity(op=self.curr_tok.value)
 
     def __curr_tok_is_operator(self, operator_value: str) -> bool:
         return self.curr_tok.type == TokenType.OPERATOR and self.curr_tok.value == operator_value
@@ -156,8 +159,11 @@ class Parser:
 
             # If bin_op binds less tightly with RHS than the operator
             # after RHS, let the pending operator take RHS as its LHS
-            if curr_prec < (_next_prec := self.__curr_tok_precedence()):
+            if curr_prec < (next_prec := self.__curr_tok_precedence()):
                 rhs = self._parse_bin_op_rhs(curr_prec + 1, rhs)
+
+            elif curr_prec == next_prec and self.__curr_tok_associativity() == Associativity.RIGHT:
+                rhs = self._parse_bin_op_rhs(curr_prec, rhs)
 
             # Merge LHS/RHS
             lhs = kal_ast.BinaryExpr(bin_op, lhs, rhs)
@@ -180,10 +186,10 @@ class Parser:
         self.__eat_tok()  # 'if'
         cond_expr = self._parse_expression()
 
-        self.__try_eat_tok(TokenType.THEN, expected_value="then")  # 'then'
+        self.__try_eat_tok(TokenType.THEN)  # 'then'
         then_expr = self._parse_expression()
 
-        self.__try_eat_tok(TokenType.ELSE, expected_value="else")  # 'else'
+        self.__try_eat_tok(TokenType.ELSE)  # 'else'
         else_expr = self._parse_expression()
 
         return kal_ast.IfExpr(cond_expr, then_expr, else_expr)
@@ -226,8 +232,7 @@ class Parser:
             name = self.curr_tok.value
             self.__eat_tok()  # identifier
 
-            init = None
-            # Parse the optional initializer
+            init = None  # an initializer is optional
             if self.__curr_tok_is_operator("="):
                 self.__eat_tok()  # '='
                 init = self._parse_expression()

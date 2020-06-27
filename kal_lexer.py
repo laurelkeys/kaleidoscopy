@@ -59,25 +59,25 @@ class Lexer:
         self.last_char = source_code[0]
         self.pos = 0  # index of last_char on source_code
 
-    def __get_char(self) -> str:
+    def __advance_last_char(self) -> str:
         try:
             self.pos += 1
-            return self.source_code[self.pos]
+            self.last_char = self.source_code[self.pos]
         except IndexError:
-            return ""
+            self.last_char = ""
 
     def tokens(self) -> Iterator[Token]:
         while self.last_char:
             # Skip any whitespace
             while self.last_char.isspace():
-                self.last_char = self.__get_char()
+                self.__advance_last_char()
 
-            # Indentifier or keyword: [a-zA-Z][a-zA-Z0-9]*
+            # Indentifier or keyword: [_a-zA-Z][_a-zA-Z0-9]*
             if self.last_char.isalpha():
                 id_str = ""
-                while self.last_char.isalnum():
+                while self.last_char.isalnum() or self.last_char == "_":
                     id_str += self.last_char
-                    self.last_char = self.__get_char()
+                    self.__advance_last_char()
                 try:
                     yield keywords[id_str]
                 except KeyError:
@@ -88,18 +88,18 @@ class Lexer:
                 num_str = ""
                 while self.last_char.isdigit() or self.last_char == ".":
                     num_str += self.last_char
-                    self.last_char = self.__get_char()
+                    self.__advance_last_char()
                 yield Token(TokenType.NUMBER, value=num_str)
 
             # Comment (until end of line): #.*\n
             elif self.last_char == "#":
-                self.last_char = self.__get_char()
+                self.__advance_last_char()
                 while self.last_char and self.last_char not in "\r\n":
-                    self.last_char = self.__get_char()
+                    self.__advance_last_char()
 
             # Otherwise, just return the character
             elif self.last_char:
                 yield Token(type=TokenType.OPERATOR, value=self.last_char)
-                self.last_char = self.__get_char()
+                self.__advance_last_char()
 
         yield Token(type=TokenType.EOF, value="")

@@ -169,3 +169,17 @@ def test_assignments():
     )
     assert e.eval_expr("foo(2, 3)") == 605
     assert e.eval_expr("foo(10, 20)") == 20030
+
+
+def test_triple_assignment():
+    e = KaleidoscopeCodeEvaluator()
+    e.eval_expr("def binary : 1 (x y) y")
+    e.eval_expr(
+        """
+        def foo(a)
+            var x, y, z in
+                x = y = z = a
+                : x + 2 * y + 3 * z
+        """
+    )
+    assert e.eval_expr("foo(5)") == 30

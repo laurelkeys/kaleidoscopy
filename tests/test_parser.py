@@ -5,8 +5,18 @@ except:
 
 from typing import List, Optional
 
-from kal_ast import (Node, CallExpr, Function, Prototype, UnaryExpr, VarInExpr, BinaryExpr,
-                     NumberExpr, VariableExpr)
+from kal_ast import (
+    Node,
+    CallExpr,
+    Function,
+    Prototype,
+    UnaryExpr,
+    VarInExpr,
+    BinaryExpr,
+    NumberExpr,
+    VariableExpr,
+)
+from kal_ops import DEFAULT_PRECEDENCE
 from kal_parser import Parser
 
 # ref.: https://github.com/eliben/pykaleidoscope/
@@ -171,7 +181,7 @@ def test_binary_op_no_prec():
     proto = ast.proto
     assert isinstance(proto, Prototype)
     assert proto.is_operator
-    assert proto.bin_op_precedence == 30
+    assert proto.bin_op_precedence == DEFAULT_PRECEDENCE
     assert proto.name == "binary$"
 
 
