@@ -45,7 +45,7 @@ def errprint(msg):
 
 def print_eval(k, kal_code, options=None):
     """ Evaluate the given code with `k` using the given `options` and print the results. """
-    results = k._evaluate(kal_code, options or {})
+    results = k.eval(kal_code, options or {})
     try:
         for result in results:
             if (value := result.value) is not None:

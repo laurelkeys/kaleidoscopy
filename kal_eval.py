@@ -17,7 +17,7 @@ from kal_parser import Parser
 
 
 EvalResult = namedtuple(
-    typename="EvalResult", field_names=["value", "ast", "unoptimized_ir", "optimized_ir"],
+    typename="EvalResult", field_names=["ast", "unoptimized_ir", "optimized_ir", "value"],
 )
 
 
@@ -33,31 +33,45 @@ class KaleidoscopeCodeEvaluator:
         llvm.initialize()
         llvm.initialize_native_target()
         llvm.initialize_native_asmprinter()
-        # llvm.initialize_native_asmparser()
-
-        self.code_generator = LLVMCodeGenerator()
-        self.__add_built_ins()
-
-        self.parser = Parser()
 
         self.target = llvm.Target.from_default_triple()
+        self.reset()
 
     def __add_built_ins(self):
+        """ Add `putchard()`. """
         # ref.: https://github.com/eliben/pykaleidoscope
+
+        # Add the declaration of putchar
         putchar = ir.Function(
             self.code_generator.module,
             ftype=ir.FunctionType(return_type=ir.IntType(32), args=[ir.IntType(32)]),
             name="putchar",
         )
+
+        # Add putchard
         putchard = ir.Function(
             self.code_generator.module,
             ftype=ir.FunctionType(return_type=ir.DoubleType(), args=[ir.DoubleType()]),
             name="putchard",
         )
-        irbuilder = ir.IRBuilder(block=putchard.append_basic_block("entry"))
-        ival = irbuilder.fptoui(putchard.args[0], ir.IntType(32), "intcast")
-        irbuilder.call(fn=putchar, args=[ival])
-        irbuilder.ret(value=ir.Constant(ir.DoubleType(), 0.0))
+
+        builder = ir.IRBuilder(block=putchard.append_basic_block("entry"))
+        int_value = builder.fptoui(putchard.args[0], ir.IntType(32), "intcast")
+        builder.call(fn=putchar, args=[int_value])
+        builder.ret(value=ir.Constant(ir.DoubleType(), 0.0))
+
+    def __last_ir(self, index: int = -1) -> str:
+        """ Returns the last bunch of code added to `self.code_generator.module`.
+            Thus, this gets the lastly generated IR for the top-level expression.
+        """
+        # ref.: https://github.com/frederickjeanguerin/pykaleidoscope
+        return str(self.code_generator.module).split("\n\n")[index]
+
+    def __dump(self, text, into, and_log=None):
+        """ Create a file named `into` and dump `text` into it. """
+        with open(into, "w") as dump:
+            dump.write(str(text))
+            print(colored(f"{and_log} dumped to '{dump.name}'", color="yellow"))
 
     def reset(self, history: Optional[List[kal_ast.Node]] = None) -> bool:
         self.code_generator = LLVMCodeGenerator()
@@ -65,27 +79,28 @@ class KaleidoscopeCodeEvaluator:
         if history is not None:
             try:
                 for ast in history:
-                    self._evaluate_ast(ast)
+                    self._eval_ast(ast)
             except GenerateCodeError:
                 return False
         return True  # successfully reset
 
-    def evaluate(self, kal_code: str, options: Dict[str, bool] = None) -> Optional[float]:
+    def eval_expr(self, kal_code: str, options: Dict[str, bool] = None) -> Optional[float]:
         # NOTE since Kaleidoscope only deals with doubles, return types are always 'float'
-        return next(self._evaluate(kal_code, options or {})).value
+        # FIXME depending on `options`, `value` may result in a 'str' instead of a 'float'
+        """ Evaluates only the first top-level expression in `kal_code`. """
+        return next(self.eval(kal_code, options or {})).value
 
-    def _evaluate(self, kal_code: str, options: Dict[str, bool]) -> Iterator[EvalResult]:
-        """ Evaluates the given Kaleidoscope code `kal_code`.
+    def eval(self, kal_code: str, options: Dict[str, bool]) -> Iterator[EvalResult]:
+        """ Iterator that evaluates the given Kaleidoscope code `kal_code`.
 
-            Returns an `EvalResult` with the result accessible in `.value`.\n
-            Return value is `None` for definitions and 'extern's, and the evaluated expression value for top-level expressions.
+            Yields an `EvalResult` with the result accessible in `.value`.\n
+            Note: `.value` is `None` for definitions and 'extern's, and the evaluated expression value for top-level expressions.
         """
-        # Parse the given Kaleidoscope code and generate LLVM IR code from it
-        for ast in self.parser.parse(kal_code):
-            # FIXME `options` may make the `.value` result a `str` instead of a `float`
-            yield self._evaluate_ast(ast, **options)
+        # Parse the given Kaleidoscope code and generate LLVM IR from it
+        for ast in Parser().parse(kal_code):
+            yield self._eval_ast(ast, **options)
 
-    def _evaluate_ast(
+    def _eval_ast(
         self,
         ast: kal_ast.Node,
         optimize=True,
@@ -104,67 +119,55 @@ class KaleidoscopeCodeEvaluator:
             - `parseonly`: simply parse the code (note: yields a string representation of the AST)
             - `verbose`: yields a quadruple with: result value, AST, unoptimized IR, optimized IR
         """
+        raw_ir = None
+        opt_ir = None
         if parseonly:
-            return EvalResult(value=str(ast), ast=ast, unoptimized_ir=None, optimized_ir=None)
+            return EvalResult(ast, raw_ir, opt_ir, value=str(ast))
 
-        # Generate LLVM IR code from the AST representation of the code
+        # Generate LLVM IR from the AST representation of the code
         self.code_generator.generate_code(ast)
 
+        raw_ir = self.__last_ir()
+
         if noexec:
-            return EvalResult(
-                value=str(self.code_generator.module).split("\n\n")[-1],
-                ast=ast,
-                unoptimized_ir=None,
-                optimized_ir=None,
-            )
-
-        raw_ir = None
-        if verbose:
-            raw_ir = str(self.code_generator.module).split("\n\n")[-1]
-
-        if llvmdump:
-            with open("__dump__unoptimized.ll", "w") as dump:
-                dump.write(str(self.code_generator.module))
-                print(
-                    colored(f"Unoptimized LLVM IR code dumped to '{dump.name}'", color="yellow",)
-                )
-
-        # If we're evaluating an anonymous wrapper for a top-level expression,
-        # JIT-compile the module and run the function to get its result
-        is_def_or_extern = not (isinstance(ast, kal_ast.Function) and ast.is_anonymous())
+            return EvalResult(ast, raw_ir, opt_ir, value=raw_ir)
 
         # If we're evaluating a definition or extern declaration, don't do anything else
-        if is_def_or_extern and not verbose:
-            return EvalResult(value=None, ast=ast, unoptimized_ir=raw_ir, optimized_ir=None)
+        # If it's an anonymous wrapper, JIT-compile the module and run the function to get its result
+        is_def_or_extern = not (isinstance(ast, kal_ast.Function) and ast.is_anonymous())
+        if is_def_or_extern and not optimize:
+            return EvalResult(ast, raw_ir, opt_ir, value=None)
 
         # Convert LLVM IR into in-memory representation and verify the code
         llvmmod: llvm.ModuleRef = llvm.parse_assembly(str(self.code_generator.module))
         llvmmod.verify()
 
+        if llvmdump:
+            self.__dump(
+                llvmmod, into="__dump__unoptimized.ll", and_log="Unoptimized LLVM IR code",
+            )
+
         # Run module optimization passes
         if optimize:
             pmb = llvm.create_pass_manager_builder()
-            pmb.opt_level = 2
             pm = llvm.create_module_pass_manager()
+
+            pmb.opt_level = 2
             pmb.populate(pm)
             pm.run(llvmmod)
             # FIXME make sure all optimizations at InitializeModuleAndPassManager() are enabled
 
             if llvmdump:
-                with open("__dump__optimized.ll", "w") as dump:
-                    dump.write(str(llvmmod))
-                    print(
-                        colored(
-                            f"Optimized LLVM IR code dumped to '{dump.name}'", color="yellow",
-                        )
-                    )
+                self.__dump(
+                    llvmmod, into="__dump__optimized.ll", and_log="Optimized LLVM IR code",
+                )
 
-        opt_ir = None
-        if verbose:
-            opt_ir = str(self.code_generator.module).split("\n\n")[-2]
-            if is_def_or_extern:
-                return EvalResult(value=None, ast=ast, unoptimized_ir=raw_ir, optimized_ir=opt_ir)
+            opt_ir = self.__last_ir(index=-2)
 
+        if is_def_or_extern:
+            return EvalResult(ast, raw_ir, opt_ir, value=None)
+
+        # Create a MCJIT execution engine to JIT-compile the module
         # NOTE a execution_engine takes ownership of target_machine, so it
         # has to be recreated anew each time we call create_mcjit_compiler
         target_machine = self.target.create_target_machine()
@@ -172,11 +175,13 @@ class KaleidoscopeCodeEvaluator:
             execution_engine.finalize_object()
 
             if llvmdump:
-                with open("__dump__assembler.asm", "w") as dump:
-                    dump.write(target_machine.emit_assembly(llvmmod))
-                    print(colored(f"Machine code dumped to '{dump.name}'", color="yellow"))
+                self.__dump(
+                    target_machine.emit_assembly(llvmmod),
+                    into="__dump__assembler.asm",
+                    and_log="Machine code",
+                )
 
             fn_ptr = CFUNCTYPE(c_double)(execution_engine.get_function_address(ast.proto.name))
-
             result = fn_ptr()
-            return EvalResult(value=result, ast=ast, unoptimized_ir=raw_ir, optimized_ir=opt_ir)
+
+            return EvalResult(ast, raw_ir, opt_ir, value=result)

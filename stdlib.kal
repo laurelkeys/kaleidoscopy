@@ -1,13 +1,13 @@
-def unary! (v)
+def unary ! (v)
   if v then 0 else 1;
 
-def unary- (v)
-  0-v;
+def unary - (v)
+  0 - v;
 
-def binary> 10 (lhs rhs)
+def binary > 10 (lhs rhs)
   rhs < lhs;
 
-def binary| 5 (lhs rhs)
+def binary | 5 (lhs rhs)
   if lhs then
     1
   else if rhs then
@@ -15,16 +15,17 @@ def binary| 5 (lhs rhs)
   else
     0;
 
-def binary& 6 (lhs rhs)
+def binary & 6 (lhs rhs)
   if !lhs then
     0
   else
     !!rhs;
 
-def binary= 9 (lhs rhs)
+def binary = 9 (lhs rhs)
   !(lhs < rhs | lhs > rhs);
 
-def binary: 1 (x y) y;
+def binary : 1 (x y)
+  y;
 
 # NOTES:
 # - defined '>' with the same precedence as '<'

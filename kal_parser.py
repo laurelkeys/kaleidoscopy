@@ -22,13 +22,26 @@ class Parser:
     def __curr_tok_precedence(self) -> int:
         return get_precedence(op=self.curr_tok.value)
 
-    def __curr_tok_is_operator(self, operator: str) -> bool:
-        return self.curr_tok.type == TokenType.OPERATOR and self.curr_tok.value == operator
+    def __curr_tok_is_operator(self, operator_value: str) -> bool:
+        return self.curr_tok.type == TokenType.OPERATOR and self.curr_tok.value == operator_value
+
+    def __eat_tok(self) -> Token:
+        self.curr_tok = next(self.tokens)
+
+    def __try_eat_tok(self, expected_type: TokenType, expected_value: Optional[str] = None) -> Token:
+        if expected_type != self.curr_tok.type:
+            raise ParseError(f"Expected '{expected_type}'")
+
+        elif expected_type == TokenType.OPERATOR or expected_value is not None:
+            if self.curr_tok.value != expected_value:
+                raise ParseError(f"Expected '{expected_value}' but got '{self.curr_tok.value}'")
+
+        self.__eat_tok()
 
     def parse(self, source_code: str) -> Iterator[Optional[kal_ast.Node]]:
         """ Returns the nodes of the AST representation of `source_code`. """
         self.tokens = Lexer(source_code).tokens()
-        self.curr_tok = next(self.tokens)
+        self.__eat_tok()
 
         while self.curr_tok.type != TokenType.EOF:
             if (top_level := self._parse_top_level()) is not None:
@@ -41,7 +54,7 @@ class Parser:
                         | ';'`
         """
         if self.__curr_tok_is_operator(";"):
-            self.curr_tok = next(self.tokens)  # ignore top-level semicolons
+            self.__eat_tok()  # ignore top-level semicolons
             return None
 
         elif self.curr_tok.type == TokenType.DEF:
@@ -56,18 +69,14 @@ class Parser:
     def _parse_number_expr(self) -> Optional[kal_ast.Expr]:
         """ `numberexpr ::= number` """
         result = kal_ast.NumberExpr(self.curr_tok.value)
-        self.curr_tok = next(self.tokens)  # eat number
+        self.__eat_tok()  # number
         return result
 
     def _parse_paren_expr(self) -> Optional[kal_ast.Expr]:
         """ `parenexpr ::= '(' expression ')'` """
-        self.curr_tok = next(self.tokens)  # eat '('
+        self.__eat_tok()  # '('
         expr = self._parse_expression()
-        if not expr:
-            return None
-        elif not self.__curr_tok_is_operator(")"):
-            raise ParseError("Expected ')'")
-        self.curr_tok = next(self.tokens)  # eat ')'
+        self.__try_eat_tok(TokenType.OPERATOR, expected_value=")")  # ')'
         return expr
 
     def _parse_identifier_expr(self) -> Optional[kal_ast.Expr]:
@@ -75,31 +84,22 @@ class Parser:
                               |  identifier '(' expression* ')'`
         """
         id_name = self.curr_tok.value
-        self.curr_tok = next(self.tokens)  # eat identifier
+        self.__eat_tok()  # identifier
 
         # Simple variable ref
         if not self.__curr_tok_is_operator("("):
             return kal_ast.VariableExpr(id_name)
 
         # Function call
-        self.curr_tok = next(self.tokens)  # eat '('
+        self.__eat_tok()  # '('
         args: List[kal_ast.Expr] = []
         if not self.__curr_tok_is_operator(")"):
             while True:
-                # args.append(self._parse_expression())
-                if (arg := self._parse_expression()) is not None:
-                    args.append(arg)
-                else:
-                    return None
-
+                args.append(self._parse_expression())
                 if self.__curr_tok_is_operator(")"):
                     break
-
-                if not self.__curr_tok_is_operator(","):
-                    raise ParseError("Expected ')' or ',' in argument list")
-                self.curr_tok = next(self.tokens)  # eat ','
-
-        self.curr_tok = next(self.tokens)  # eat ')'
+                self.__try_eat_tok(TokenType.OPERATOR, expected_value=",")  # ','
+        self.__eat_tok()  # ')'
         return kal_ast.CallExpr(id_name, args)
 
     def _parse_primary(self) -> Optional[kal_ast.Expr]:
@@ -128,15 +128,12 @@ class Parser:
         elif self.curr_tok.type == TokenType.VAR:
             return self._parse_var_expr()
 
-        else:
-            raise ParseError(
-                f"Unknown token '{self.curr_tok.value}' when expecting an expression"
-            )
+        raise ParseError(f"Unknown token '{self.curr_tok.value}' when expecting an expression")
 
     def _parse_expression(self) -> Optional[kal_ast.Expr]:
         """ `expression ::= unary binoprhs` """
         lhs = self._parse_unary()
-        # NOTE Start with precedence 0 because we want to
+        # NOTE start with precedence 0, because we want to
         # bind any operator to the expression at this point
         return self._parse_bin_op_rhs(expr_prec=0, lhs=lhs)
 
@@ -145,28 +142,21 @@ class Parser:
 
             Note: `expr_prec` is the minimum precedence to keep going (precedence climbing).
         """
-        # If this is a binop, find its precedence
         while True:
-            curr_prec = self.__curr_tok_precedence()
-
             # If this is a binary operator that binds at least as tightly as the
             # currently parsed sub-expression, consume it, otherwise we are done
-            if curr_prec < expr_prec:
-                # NOTE The precedence of non-operators is defined to be -1,
-                # so this condition handles cases when the expression ended
+            if (curr_prec := self.__curr_tok_precedence()) < expr_prec:
+                # NOTE the precedence of non-operators is defined to be -1,
+                # so this condition handles cases when the expression has ended
                 return lhs
 
-            # Binary operator
             bin_op = self.curr_tok.value
-            self.curr_tok = next(self.tokens)  # eat <binop>
-
-            # Parse the unary expression after the binary operator
+            self.__eat_tok()  # <binop>
             rhs = self._parse_unary()
 
             # If bin_op binds less tightly with RHS than the operator
             # after RHS, let the pending operator take RHS as its LHS
-            next_prec = self.__curr_tok_precedence()
-            if curr_prec < next_prec:
+            if curr_prec < (_next_prec := self.__curr_tok_precedence()):
                 rhs = self._parse_bin_op_rhs(curr_prec + 1, rhs)
 
             # Merge LHS/RHS
@@ -182,113 +172,80 @@ class Parser:
 
         # Unary operator
         un_op = self.curr_tok.value
-        self.curr_tok = next(self.tokens)  # eat <unop>
+        self.__eat_tok()  # <unop>
         return kal_ast.UnaryExpr(op=un_op, operand=self._parse_unary())
 
     def _parse_if_expr(self) -> Optional[kal_ast.Expr]:
         """ `ifexpr ::= 'if' expression 'then' expression 'else' expression` """
-        self.curr_tok = next(self.tokens)  # eat 'if'
-
+        self.__eat_tok()  # 'if'
         cond_expr = self._parse_expression()
 
-        if self.curr_tok.type != TokenType.THEN:
-            raise ParseError("Expected 'then'")
-        self.curr_tok = next(self.tokens)  # eat 'then'
+        self.__try_eat_tok(TokenType.THEN, expected_value="then")  # 'then'
         then_expr = self._parse_expression()
 
-        if self.curr_tok.type != TokenType.ELSE:
-            raise ParseError("Expected 'else'")
-        self.curr_tok = next(self.tokens)  # eat 'else'
+        self.__try_eat_tok(TokenType.ELSE, expected_value="else")  # 'else'
         else_expr = self._parse_expression()
 
         return kal_ast.IfExpr(cond_expr, then_expr, else_expr)
 
     def _parse_for_expr(self) -> Optional[kal_ast.Expr]:
-        """ `forexpr ::= 'for' identifier '=' expr ',' expr (',' expr)? 'in' expression` """
-        self.curr_tok = next(self.tokens)  # eat 'for'
-
-        if self.curr_tok.type != TokenType.IDENTIFIER:
-            raise ParseError("Expected identifier after 'for'")
+        """ `forexpr ::= 'for' identifier '=' expression ',' expression (',' expression)? 'in' expression` """
+        self.__eat_tok()  # 'for'
 
         id_name = self.curr_tok.value
-        self.curr_tok = next(self.tokens)  # eat identifier
-
-        if not self.__curr_tok_is_operator("="):
-            raise ParseError("Expected '=' after 'for'")
-        self.curr_tok = next(self.tokens)  # eat '='
-
+        self.__try_eat_tok(TokenType.IDENTIFIER)  # identifier
+        self.__try_eat_tok(TokenType.OPERATOR, expected_value="=")  # '='
         init_expr = self._parse_expression()
 
-        if not self.__curr_tok_is_operator(","):
-            raise ParseError("Expected ',' after 'for' init value")
-        self.curr_tok = next(self.tokens)  # eat ','
-
+        self.__try_eat_tok(TokenType.OPERATOR, expected_value=",")  # ','
         cond_expr = self._parse_expression()
 
         step_expr = None  # the step value is optional
         if self.__curr_tok_is_operator(","):
-            self.curr_tok = next(self.tokens)  # eat ','
+            self.__eat_tok()  # ','
             step_expr = self._parse_expression()
 
-        if self.curr_tok.type != TokenType.IN:
-            raise ParseError("Expected 'in' after 'for'")
-        self.curr_tok = next(self.tokens)  # eat 'in'
-
+        self.__try_eat_tok(TokenType.IN)  # 'in'
         body_expr = self._parse_expression()
 
         return kal_ast.ForExpr(id_name, init_expr, cond_expr, step_expr, body_expr)
 
     def _parse_var_expr(self) -> Optional[kal_ast.Expr]:
         """ `varexpr ::= 'var' identifier ('=' expression)?
-                       | (',' identifier ('=' expression)?)* 'in' expression`
+                               (',' identifier ('=' expression)?)*
+                         'in' expression`
         """
-        self.curr_tok = next(self.tokens)  # eat 'var'
+        self.__eat_tok()  # 'var'
 
         # At least one variable name is required
         if self.curr_tok.type != TokenType.IDENTIFIER:
             raise ParseError("Expected identifier after 'var'")
 
-        vars_init_list = []
+        var_names = []
         while True:
-            var_init = None
-            var_name = self.curr_tok.value
-            self.curr_tok = next(self.tokens)  # eat identifier
+            name = self.curr_tok.value
+            self.__eat_tok()  # identifier
 
+            init = None
             # Parse the optional initializer
             if self.__curr_tok_is_operator("="):
-                self.curr_tok = next(self.tokens)  # eat '='
-                var_init = self._parse_expression()
+                self.__eat_tok()  # '='
+                init = self._parse_expression()
 
-            vars_init_list.append((var_name, var_init))
-            if not self.__curr_tok_is_operator("="):
-                break  # end of var list
+            var_names.append((name, init))
 
-            self.curr_tok = next(self.tokens)  # eat ','
+            # If there are no more vars, we're done
+            if not self.__curr_tok_is_operator(","):
+                break
+
+            self.__eat_tok()  # ','
             if self.curr_tok.type != TokenType.IDENTIFIER:
-                raise ParseError("Expected identifier list in 'var' after ','")
+                raise ParseError("Expected identifier in 'var' after ','")
 
-        if self.curr_tok.type != TokenType.IN:
-            raise ParseError("Expected 'in' keyword after 'var'")
-        self.curr_tok = next(self.tokens)  # eat 'in'
+        self.__try_eat_tok(TokenType.IN)  # 'in'
+        body_expr = self._parse_expression()
 
-        body = self._parse_expression()
-        return kal_ast.VarExpr(vars_init_list, body)
-
-    def __parse_prototype_params(self) -> List[str]:
-        if not self.__curr_tok_is_operator("("):
-            raise ParseError("Expected '(' in prototype")
-        self.curr_tok = next(self.tokens)  # eat '('
-
-        params: List[str] = []
-        while self.curr_tok.type == TokenType.IDENTIFIER:
-            params.append(self.curr_tok.value)
-            self.curr_tok = next(self.tokens)  # eat identifier
-
-        if not self.__curr_tok_is_operator(")"):
-            raise ParseError("Expected ')' in prototype")
-        self.curr_tok = next(self.tokens)  # eat ')'
-
-        return params
+        return kal_ast.VarInExpr(var_names, body_expr)
 
     def _parse_prototype(self) -> Optional[kal_ast.Prototype]:
         """ `prototype ::= identifier '(' identifier* ')'
@@ -297,9 +254,7 @@ class Parser:
         """
         if self.curr_tok.type == TokenType.IDENTIFIER:
             fn_name = self.curr_tok.value
-            self.curr_tok = next(self.tokens)  # eat identifier
-
-            # Read the list of argument names
+            self.__eat_tok()  # identifier
             params: List[str] = self.__parse_prototype_params()
             return kal_ast.Prototype(fn_name, params)
 
@@ -309,30 +264,42 @@ class Parser:
         elif self.curr_tok.type == TokenType.UNARY:
             return self.__parse_prototype_for_user_def_un_op()
 
-        else:
-            raise ParseError("Expected function name in prototype")
+        raise ParseError("Expected function name in prototype")
+
+    def __parse_prototype_params(self) -> List[str]:
+        """ Helper for parsing `'(' identifier* ')'`. """
+        self.__try_eat_tok(TokenType.OPERATOR, expected_value="(")  # '('
+
+        # Read the list of argument names
+        params: List[str] = []
+        while self.curr_tok.type == TokenType.IDENTIFIER:
+            params.append(self.curr_tok.value)
+            self.__eat_tok()  # identifier
+        self.__try_eat_tok(TokenType.OPERATOR, expected_value=")")  # ')'
+
+        return params
 
     def __parse_prototype_for_user_def_bin_op(self) -> Optional[kal_ast.Prototype]:
-        self.curr_tok = next(self.tokens)  # eat 'binary'
+        """ Helper for parsing `'binary' LETTER number? '(' identifier identifier ')'`. """
+        self.__eat_tok()  # 'binary'
         if self.curr_tok.type != TokenType.OPERATOR:
             raise ParseError("Expected operator after 'binary'")
         fn_name = f"binary{self.curr_tok.value}"
-        self.curr_tok = next(self.tokens)  # eat LETTER
+        self.__eat_tok()  # LETTER
 
         # Read the precedence, if present
         precedence = kal_ops.DEFAULT_PRECEDENCE
         if self.curr_tok.type == TokenType.NUMBER:
             precedence = int(self.curr_tok.value)
             if not (1 <= precedence <= 100):
-                raise ParseError(f"Invalid precedence: {precedence} (must be 1..100)")
-            self.curr_tok = next(self.tokens)  # eat number
+                raise ParseError(f"Invalid precedence: {precedence} (must be in 1..100)")
+            self.__eat_tok()  # number
 
         # As this is a new binary operator, install it
         operators[fn_name[-1]] = kal_ops.OperatorInfo(
             kal_ops.Associativity.NON, precedence  # FIXME associativty
         )
 
-        # Read the list of argument names
         params: List[str] = self.__parse_prototype_params()
         if len(params) != 2:
             raise ParseError("Expected binary operator to have two operands")
@@ -340,13 +307,13 @@ class Parser:
         return kal_ast.Prototype(fn_name, params, is_operator=True, bin_op_precedence=precedence)
 
     def __parse_prototype_for_user_def_un_op(self) -> Optional[kal_ast.Prototype]:
-        self.curr_tok = next(self.tokens)  # eat 'unary'
+        """ Helper for parsing `'unary' LETTER '(' identifier ')'`. """
+        self.__eat_tok()  # 'unary'
         if self.curr_tok.type != TokenType.OPERATOR:
             raise ParseError("Expected operator after 'unary'")
         fn_name = f"unary{self.curr_tok.value}"
-        self.curr_tok = next(self.tokens)  # eat LETTER
+        self.__eat_tok()  # LETTER
 
-        # Read the list of argument names
         params: List[str] = self.__parse_prototype_params()
         if len(params) != 1:
             raise ParseError("Expected unary operator to have one operand")
@@ -355,14 +322,14 @@ class Parser:
 
     def _parse_definition(self) -> Optional[kal_ast.Function]:
         """ `definition ::= 'def' prototype expression` """
-        self.curr_tok = next(self.tokens)  # eat 'def'
+        self.__eat_tok()  # 'def'
         proto = self._parse_prototype()
         expr = self._parse_expression()
         return kal_ast.Function(proto, body=expr)
 
     def _parse_external(self) -> Optional[kal_ast.Prototype]:
         """ `external ::= 'extern' prototype` """
-        self.curr_tok = next(self.tokens)  # eat 'extern'
+        self.__eat_tok()  # 'extern'
         return self._parse_prototype()
 
     def _parse_top_level_expr(self) -> Optional[kal_ast.Function]:

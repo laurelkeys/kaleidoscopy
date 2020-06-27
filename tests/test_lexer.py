@@ -1,5 +1,5 @@
 try:
-    from context import *
+    from __kal_context__ import *
 except:
     pass
 

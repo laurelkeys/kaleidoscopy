@@ -11,16 +11,18 @@ class Associativity(Enum):
 
 OperatorInfo = namedtuple(typename="Operator", field_names=["associativity", "precedence"])
 
+
 DEFAULT_PRECEDENCE = 30  # used for user-defined binary operators
 
+
 operators: Dict[str, OperatorInfo] = {
-    # 1 is the lowest precedence
+    # lower precedence
     "=": OperatorInfo(Associativity.RIGHT, precedence=2),
     "<": OperatorInfo(Associativity.LEFT, precedence=10),
     "+": OperatorInfo(Associativity.LEFT, precedence=20),
     "-": OperatorInfo(Associativity.LEFT, precedence=20),
     "*": OperatorInfo(Associativity.LEFT, precedence=40),
-    # 100 is the highest precedence
+    # higher precedence
 }
 assert all([op.precedence >= 1 for op in operators.values()]), "1 is lowest definable precedence"
 
