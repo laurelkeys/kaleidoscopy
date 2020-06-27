@@ -139,7 +139,7 @@ class KaleidoscopeCodeEvaluator:
             return EvalResult(ast, raw_ir, opt_ir, value=None)
 
         # Convert LLVM IR into in-memory representation and verify the code
-        llvmmod: llvm.ModuleRef = llvm.parse_assembly(str(self.code_generator.module))
+        llvmmod: llvm.ModuleRef = llvm.parse_assembly(llvmir=str(self.code_generator.module))
         llvmmod.verify()
 
         if llvmdump:
@@ -185,3 +185,14 @@ class KaleidoscopeCodeEvaluator:
             result = fn_ptr()
 
             return EvalResult(ast, raw_ir, opt_ir, value=result)
+
+    def compile_to_object_code(self):
+        """ Compile the previously evaluated code into an object file for the native target.
+            Returns its contents as a byte string.
+        """
+        # ref.: https://github.com/eliben/pykaleidoscope/
+        target_machine: llvm.TargetMachine = self.target.create_target_machine(codemodel="small")
+
+        # Convert LLVM IR into in-memory representation
+        llvmmod: llvm.ModuleRef = llvm.parse_assembly(llvmir=str(self.code_generator.module))
+        return target_machine.emit_object(llvmmod)

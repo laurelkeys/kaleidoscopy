@@ -3,6 +3,8 @@ try:
 except:
     pass
 
+import os
+
 from typing import List, Optional
 
 from kal_ir import LLVMCodeGenerator
@@ -183,3 +185,29 @@ def test_triple_assignment():
         """
     )
     assert e.eval_expr("foo(5)") == 30
+
+
+def test_compiling_to_object_code():
+    e = KaleidoscopeCodeEvaluator()
+    e.eval_expr("def average(x y) (x + y) * 0.5;")
+
+    import llvmlite.binding as llvm
+
+    obj = e.compile_to_object_code()
+    obj_format = llvm.get_object_format()
+
+    # Check the magic number of object format
+    elf_magic = b"\x7fELF"
+    macho_magic = b"\xfe\xed\xfa\xcf"
+    if obj[:4] == elf_magic:
+        assert obj_format == "ELF"
+    elif obj[:4] == macho_magic:
+        assert obj_format == "MachO"
+    else:
+        # There are too many variations of COFF magic number,
+        # so we assume all other formats are COFF
+        assert obj_format == "COFF"
+
+    # NOTE uncoment to output the generated code
+    # with open(os.path.join(os.path.dirname(__file__), "average.o"), "wb") as average_obj_file:
+    #     average_obj_file.write(obj)

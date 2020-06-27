@@ -1,4 +1,4 @@
-from typing import List, Iterator, Optional
+from typing import List, Tuple, Iterator, Optional
 
 import kal_ast
 import kal_ops
@@ -227,7 +227,7 @@ class Parser:
         if self.curr_tok.type != TokenType.IDENTIFIER:
             raise ParseError("Expected identifier after 'var'")
 
-        var_names = []
+        var_names: List[Tuple[str, Optional[kal_ast.Expr]]] = []
         while True:
             name = self.curr_tok.value
             self.__eat_tok()  # identifier

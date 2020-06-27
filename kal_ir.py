@@ -105,7 +105,7 @@ class LLVMCodeGenerator:
         raise GenerateCodeError(f"Unknown unary operator '{node.op}'")
 
     def _emit_VarInExpr(self, node: kal_ast.VarInExpr) -> ir.Value:
-        old_bindings = {}
+        old_bindings: Dict[str, ir.AllocaInstr] = {}
 
         # Register all variables and emit their inits before adding them to scope
         # NOTE this prevents the initializer from referencing the variable itself
@@ -139,7 +139,7 @@ class LLVMCodeGenerator:
         # Emit the comparison value and branch to either then_bb or else_bb depending on it
         cond_value = self._emit(node.cond_expr)
         self.builder.cbranch(
-            cond=self.builder.fcmp_ordered("!=", cond_value, FALSE, name="ifcond"),
+            cond=self.builder.fcmp_ordered("!=", lhs=cond_value, rhs=FALSE, name="ifcond"),
             truebr=then_bb,
             falsebr=else_bb,
         )
