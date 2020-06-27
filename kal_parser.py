@@ -222,13 +222,15 @@ class Parser:
 
         var_names = []
         while True:
-            # Parse the name and the optional initializer
             name = self.curr_tok.value
             self.__eat_tok()  # identifier
             init = None
+
+            # Parse the name and the optional initializer
             if self.__curr_tok_is_operator("="):
                 self.__eat_tok()  # '='
                 init = self._parse_expression()
+
             var_names.append((name, init))
 
             # If there are no more vars, we're done

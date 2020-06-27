@@ -35,10 +35,12 @@ if __name__ == "__main__":
         run()
     else:
         try:
-            with open(sys.argv[1]) as kal_file:
+            with open("stdlib.kal", "r") as stdlib_file:
+                kal_stdlib = stdlib_file.read()
+            with open(sys.argv[1], "r") as kal_file:
                 kal_repl.print_eval(
                     kal_eval.KaleidoscopeCodeEvaluator(),
-                    kal_file.read(),
+                    kal_stdlib + kal_file.read(),
                     {"optimize": True, "llvmdump": True, "verbose": False},
                 )
         except FileNotFoundError:

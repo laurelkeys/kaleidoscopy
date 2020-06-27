@@ -1,21 +1,12 @@
 try:
-    from context import *
+    from __kal_context__ import *
 except:
     pass
 
 from typing import List, Optional
 
-from kal_ast import (
-    Node,
-    CallExpr,
-    Function,
-    Prototype,
-    UnaryExpr,
-    VarInExpr,
-    BinaryExpr,
-    NumberExpr,
-    VariableExpr,
-)
+from kal_ast import (Node, CallExpr, Function, Prototype, UnaryExpr, VarInExpr, BinaryExpr,
+                     NumberExpr, VariableExpr)
 from kal_parser import Parser
 
 # ref.: https://github.com/eliben/pykaleidoscope/
@@ -30,6 +21,9 @@ def _flatten(ast: Node):
         return ["Binop", ast.op, _flatten(ast.lhs), _flatten(ast.rhs)]
     elif isinstance(ast, UnaryExpr):
         return ["Unary", ast.op, _flatten(ast.operand)]
+    elif isinstance(ast, VarInExpr):
+        var_names = [[name, _flatten(init) if init else None] for name, init in ast.var_names]
+        return ["Var", var_names, _flatten(ast.body_expr)]
     elif isinstance(ast, CallExpr):
         args = [_flatten(arg) for arg in ast.args]
         return ["Call", ast.callee, args]
@@ -37,12 +31,6 @@ def _flatten(ast: Node):
         return ["Proto", ast.name, " ".join(ast.params)]
     elif isinstance(ast, Function):
         return ["Function", _flatten(ast.proto), _flatten(ast.body)]
-    elif isinstance(ast, VarInExpr):
-        return [
-            "VarIn",
-            [[name, _flatten(init) if init else None] for (name, init) in ast.var_names],
-            _flatten(ast.body_expr),
-        ]
     else:
         raise TypeError(f"Unknown type '{type(ast)}' in _flatten")
 
@@ -157,7 +145,7 @@ def test_binary_op_with_prec():
 
 
 def test_binop_relative_precedence():
-    # with precedence 77, % binds stronger than all existing ops
+    # With precedence 77, % binds stronger than all existing ops
     p = Parser()
     p.parse("def binary% 77(a b) a + b")
     ast = next(p.parse("a * 10 % 5 * 10"))
@@ -196,12 +184,12 @@ def test_assignment():
 def test_varexpr():
     p = Parser()
     ast = next(p.parse("def foo(x y) var t = 1 in y"))
-    _assert_body(ast, ["VarIn", [["t", ["Number", "1"]]], ["Variable", "y"]])
+    _assert_body(ast, ["Var", [["t", ["Number", "1"]]], ["Variable", "y"]])
     ast = next(p.parse("def foo(x y) var t = x, p = y + 1 in y"))
     _assert_body(
         ast,
         [
-            "VarIn",
+            "Var",
             [["t", ["Variable", "x"]], ["p", ["Binop", "+", ["Variable", "y"], ["Number", "1"]]]],
             ["Variable", "y"],
         ],

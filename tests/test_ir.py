@@ -1,5 +1,5 @@
 try:
-    from context import *
+    from __kal_context__ import *
 except:
     pass
 
@@ -115,3 +115,57 @@ def test_mixed_ops():
     e.eval_expr("def binary% (a b) a - b")
     assert e.eval_expr("!10 % !20") == 10
     assert e.eval_expr("^(!10 % !20)") == 100
+
+
+def test_var_expr():
+    e = KaleidoscopeCodeEvaluator()
+    e.eval_expr(
+        """
+        def foo(x y z)
+            var s1 = x + y, s2 = z + y in
+                s1 * s2"""
+    )
+    assert e.eval_expr("foo(1, 2, 3)") == 15
+
+    e = KaleidoscopeCodeEvaluator()
+    e.eval_expr("def binary : 1 (x y) y")
+    e.eval_expr(
+        """
+        def foo(step)
+            var accum in
+                (for i = 0, i < 10, step in
+                    accum = accum + i) : accum"""
+    )
+    # NOTE Kaleidoscope's 'for' loop executes the last iteration even when the
+    # condition is no longer fulfilled after the step is done: 0 + 2 + 4 + 6 + 8 + 10
+    assert e.eval_expr("foo(2)") == 30
+
+
+def test_nested_var_exprs():
+    e = KaleidoscopeCodeEvaluator()
+    e.eval_expr(
+        """
+        def foo(x y z)
+            var s1 = x + y, s2 = z + y in
+                var s3 = s1 * s2 in
+                    s3 * 100
+        """
+    )
+    assert e.eval_expr("foo(1, 2, 3)") == 1500
+
+
+def test_assignments():
+    e = KaleidoscopeCodeEvaluator()
+    e.eval_expr("def binary : 1 (x y) y")
+    e.eval_expr(
+        """
+        def foo(a b)
+            var s, p, r in
+                s = a + b :
+                p = a * b :
+                r = s + 100 * p :
+                r
+        """
+    )
+    assert e.eval_expr("foo(2, 3)") == 605
+    assert e.eval_expr("foo(10, 20)") == 20030

@@ -104,6 +104,32 @@ class LLVMCodeGenerator:
 
         raise GenerateCodeError(f"Unknown unary operator '{node.op}'")
 
+    def _emit_VarInExpr(self, node: kal_ast.VarInExpr) -> ir.Value:
+        old_bindings = {}
+
+        # Register all variables and emit their inits before adding them to scope
+        # NOTE this prevents the initializer from referencing the variable itself
+        for name, init in node.var_names:
+            init_value = ZERO if init is None else self._emit(init)
+            var_addr = self.__alloca(var_name=name)
+            self.builder.store(value=init_value, ptr=var_addr)
+
+            # Remember shadowed variable bindings so we can restore them
+            old_bindings[name] = self.func_symtab.get(name)
+            self.func_symtab[name] = var_addr
+
+        # Generate code for the body, now that all vars are in scope
+        body_value = self._emit(node.body_expr)
+
+        # Pop var/in variables from scope
+        for name, _ in node.var_names:
+            if (old_binding := old_bindings[name]) is not None:
+                self.func_symtab[name] = old_binding
+            else:
+                del self.func_symtab[name]
+
+        return body_value
+
     def _emit_IfExpr(self, node: kal_ast.IfExpr) -> ir.Value:
         # Create basic blocks in the current function to express the control flow
         then_bb = self.builder.function.append_basic_block("then")
