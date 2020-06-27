@@ -26,6 +26,7 @@ class TokenType(Enum):
     OPERATOR = -11  # unknown character
     BINARY = -12
     UNARY = -13
+    VAR = -14
 
 
 Token = namedtuple(typename="Token", field_names=["type", "value"])
@@ -41,6 +42,7 @@ keywords: Dict[str, Token] = {
     "in": Token(TokenType.IN, value="in"),
     "binary": Token(TokenType.BINARY, value="binary"),
     "unary": Token(TokenType.UNARY, value="unary"),
+    "var": Token(TokenType.VAR, value="var"),
 }
 assert all([kw_key == kw.value for kw_key, kw in keywords.items()])
 assert len(kw_types := [kw.type for kw in keywords.values()]) == len(set(kw_types))

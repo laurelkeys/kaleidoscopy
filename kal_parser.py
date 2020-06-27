@@ -107,7 +107,8 @@ class Parser:
                        | numberexpr
                        | parenexpr
                        | ifexpr
-                       | forexpr`
+                       | forexpr
+                       | varexpr`
         """
         if self.curr_tok.type == TokenType.IDENTIFIER:
             return self._parse_identifier_expr()
@@ -123,6 +124,9 @@ class Parser:
 
         elif self.curr_tok.type == TokenType.FOR:
             return self._parse_for_expr()
+
+        elif self.curr_tok.type == TokenType.VAR:
+            return self._parse_var_expr()
 
         raise ParseError(f"Unknown token '{self.curr_tok.value}' when expecting an expression")
 
@@ -205,6 +209,41 @@ class Parser:
         body_expr = self._parse_expression()
 
         return kal_ast.ForExpr(id_name, init_expr, cond_expr, step_expr, body_expr)
+
+    def _parse_var_expr(self) -> Optional[kal_ast.Expr]:
+        """ `varexpr ::= 'var' identifier ('=' expr)?
+                               (',' identifier ('=' expr)?)* 'in' expr`
+        """
+        self.__eat_tok()  # 'var'
+
+        # At least one variable name is required
+        if self.curr_tok.type != TokenType.IDENTIFIER:
+            raise ParseError("Expected identifier after 'var'")
+
+        var_names = []
+        while True:
+            name = self.curr_tok.value
+            self.__eat_tok()  # identifier
+
+            init = None
+            # Read the optional initializer
+            if self.__curr_tok_is_operator("="):
+                self.__eat_tok()  # '='
+                init = self._parse_expression()
+
+            var_names.append((name, init))
+
+            if not self.__curr_tok_is_operator(","):
+                break
+
+            self.__eat_tok()  # ','
+            if self.curr_tok.type != TokenType.IDENTIFIER:
+                raise ParseError("Expected identifier in 'var' after ','")
+
+        self.__try_eat_tok(TokenType.IDENTIFIER)  # identifier
+        body_expr = self._parse_expression()
+
+        return kal_ast.VarInExpr(var_names, body_expr)
 
     def _parse_prototype(self) -> Optional[kal_ast.Prototype]:
         """ `prototype ::= identifier '(' identifier* ')'

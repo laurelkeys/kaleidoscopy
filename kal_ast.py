@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Tuple, Optional
 
 import kal_ops
 
@@ -54,6 +54,14 @@ class UnaryExpr(Expr):
     def __init__(self, op: str, operand: Expr):
         self.op = op
         self.operand = operand
+
+
+class VarInExpr(Expr):
+    """ Expression class for var/in. """
+
+    def __init__(self, var_names: List[Tuple[str, Optional[Expr]]], body_expr: Expr):
+        self.var_names = var_names  # sequence of (name, init) pairs
+        self.body_expr = body_expr
 
 
 class CallExpr(Expr):
