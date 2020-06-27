@@ -11,6 +11,7 @@ from kal_ast import (
     Function,
     Prototype,
     UnaryExpr,
+    VarInExpr,
     BinaryExpr,
     NumberExpr,
     VariableExpr,
@@ -36,6 +37,12 @@ def _flatten(ast: Node):
         return ["Proto", ast.name, " ".join(ast.params)]
     elif isinstance(ast, Function):
         return ["Function", _flatten(ast.proto), _flatten(ast.body)]
+    elif isinstance(ast, VarInExpr):
+        return [
+            "VarIn",
+            [[name, _flatten(init) if init else None] for (name, init) in ast.var_names],
+            _flatten(ast.body_expr),
+        ]
     else:
         raise TypeError(f"Unknown type '{type(ast)}' in _flatten")
 
@@ -178,3 +185,24 @@ def test_binary_op_no_prec():
     assert proto.is_operator
     assert proto.bin_op_precedence == 30
     assert proto.name == "binary$"
+
+
+def test_assignment():
+    p = Parser()
+    ast = next(p.parse("def text(x) x = 5"))
+    _assert_body(ast, ["Binop", "=", ["Variable", "x"], ["Number", "5"]])
+
+
+def test_varexpr():
+    p = Parser()
+    ast = next(p.parse("def foo(x y) var t = 1 in y"))
+    _assert_body(ast, ["VarIn", [["t", ["Number", "1"]]], ["Variable", "y"]])
+    ast = next(p.parse("def foo(x y) var t = x, p = y + 1 in y"))
+    _assert_body(
+        ast,
+        [
+            "VarIn",
+            [["t", ["Variable", "x"]], ["p", ["Binop", "+", ["Variable", "y"], ["Number", "1"]]]],
+            ["Variable", "y"],
+        ],
+    )

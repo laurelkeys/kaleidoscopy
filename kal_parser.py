@@ -189,7 +189,7 @@ class Parser:
         return kal_ast.IfExpr(cond_expr, then_expr, else_expr)
 
     def _parse_for_expr(self) -> Optional[kal_ast.Expr]:
-        """ `forexpr ::= 'for' identifier '=' expr ',' expr (',' expr)? 'in' expression` """
+        """ `forexpr ::= 'for' identifier '=' expression ',' expression (',' expression)? 'in' expression` """
         self.__eat_tok()  # 'for'
 
         id_name = self.curr_tok.value
@@ -211,8 +211,8 @@ class Parser:
         return kal_ast.ForExpr(id_name, init_expr, cond_expr, step_expr, body_expr)
 
     def _parse_var_expr(self) -> Optional[kal_ast.Expr]:
-        """ `varexpr ::= 'var' identifier ('=' expr)?
-                               (',' identifier ('=' expr)?)* 'in' expr`
+        """ `varexpr ::= 'var' identifier ('=' expression)?
+                               (',' identifier ('=' expression)?)* 'in' expression`
         """
         self.__eat_tok()  # 'var'
 
@@ -222,17 +222,16 @@ class Parser:
 
         var_names = []
         while True:
+            # Parse the name and the optional initializer
             name = self.curr_tok.value
             self.__eat_tok()  # identifier
-
             init = None
-            # Read the optional initializer
             if self.__curr_tok_is_operator("="):
                 self.__eat_tok()  # '='
                 init = self._parse_expression()
-
             var_names.append((name, init))
 
+            # If there are no more vars, we're done
             if not self.__curr_tok_is_operator(","):
                 break
 
@@ -240,7 +239,7 @@ class Parser:
             if self.curr_tok.type != TokenType.IDENTIFIER:
                 raise ParseError("Expected identifier in 'var' after ','")
 
-        self.__try_eat_tok(TokenType.IDENTIFIER)  # identifier
+        self.__try_eat_tok(TokenType.IN)  # 'in'
         body_expr = self._parse_expression()
 
         return kal_ast.VarInExpr(var_names, body_expr)
