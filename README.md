@@ -47,7 +47,14 @@ parenexpr ::= '(' expression ')'
 
 ifexpr ::= 'if' expression 'then' expression 'else' expression
 
-forexpr ::= 'for' identifier '=' expr ',' expr (',' expr)? 'in' expression
+forexpr ::= 'for' identifier '=' expression
+                  ',' expression
+                  (',' expression)?
+            'in' expression
+
+varexpr ::= 'var' identifier ('=' expression)?
+                  (',' identifier ('=' expression)?)*
+            'in' expression
 ```
 
 ## References

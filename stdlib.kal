@@ -1,34 +1,43 @@
-def unary ! (v)
-  if v then 0 else 1;
+# Predefined Kaleidoscope operators and functions
+# ref.: https://github.com/frederickjeanguerin/pykaleidoscope
 
-def unary - (v)
-  0 - v;
+def unary - (a)
+    0 - a;
 
-def binary > 10 (lhs rhs)
-  rhs < lhs;
+def binary > 10 (a b)
+  b < a;
 
-def binary | 5 (lhs rhs)
-  if lhs then
-    1
-  else if rhs then
-    1
-  else
-    0;
+def max(a b)
+  if a > b then a else b
 
-def binary & 6 (lhs rhs)
-  if !lhs then
-    0
-  else
-    !!rhs;
+def min(a b)
+  if a < b then a else b
 
-def binary = 9 (lhs rhs)
-  !(lhs < rhs | lhs > rhs);
+def abs(a)
+  if a < 0 then -a else a
 
-def binary : 1 (x y)
-  y;
+# Logical not
+def unary ! (P)
+  if P then 0 else 1;
+
+# Logical or
+def binary | 5 (P Q)
+  if P then 1 else if Q then 1 else 0;
+
+# Logical and
+def binary & 6 (P Q)
+  if !P then 0 else !!Q;
+
+# Sequence operator
+def binary : 1 (a b)
+  b;
+
+# Equality
+def binary ~ 9 (a b)
+  !(a < b | a > b);
 
 # NOTES:
 # - defined '>' with the same precedence as '<'
 # - both the logical or '|' and the logical and '&' do not "short circuit"
-# - defined '=' (equality comparison) with slightly lower precedence than relationals
+# - defined '~' (equality comparison) with slightly lower precedence than relationals
 # - ':' is defined for sequencing, it's a low-precedence operator that ignores operands and just returns the RHS
