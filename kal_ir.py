@@ -42,7 +42,7 @@ class LLVMCodeGenerator:
     def __alloca(self, var_name: str) -> ir.AllocaInstr:
         """ Create an alloca instruction in the entry block of the current function. """
         with self.builder.goto_entry_block():
-            var_addr = self.builder.alloca(typ=ir.DoubleType(), size=None, name=var_name)
+            var_addr = self.builder.alloca(typ=ir.DoubleType(), size=None, name=f"{var_name}.addr")
         return var_addr
 
     def _emit(self, node: kal_ast.Node) -> Any:
@@ -132,9 +132,9 @@ class LLVMCodeGenerator:
 
     def _emit_IfExpr(self, node: kal_ast.IfExpr) -> ir.Value:
         # Create basic blocks in the current function to express the control flow
-        then_bb = self.builder.function.append_basic_block("then")
-        else_bb = self.builder.function.append_basic_block("else")
-        merge_bb = self.builder.function.append_basic_block("endif")
+        then_bb = self.builder.function.append_basic_block("if.then")
+        else_bb = self.builder.function.append_basic_block("if.else")
+        merge_bb = self.builder.function.append_basic_block("if.end")
 
         # Emit the comparison value and branch to either then_bb or else_bb depending on it
         cond_value = self._emit(node.cond_expr)
@@ -150,16 +150,16 @@ class LLVMCodeGenerator:
         # Emit the 'then' block
         self.builder.position_at_start(block=then_bb)
         then_value = self._emit(node.then_expr)
-        self.builder.branch(target=merge_bb)  # branch to 'endif' after executing 'then'
+        self.builder.branch(target=merge_bb)  # branch to 'end' after executing 'then'
         then_bb = self.builder.block
 
         # Emit the 'else' block
         self.builder.position_at_start(block=else_bb)
         else_value = self._emit(node.else_expr)
-        self.builder.branch(target=merge_bb)  # branch to 'endif' after executing 'else'
+        self.builder.branch(target=merge_bb)  # branch to 'end' after executing 'else'
         else_bb = self.builder.block
 
-        # Emit the merge ('endif') block
+        # Emit the merge ('end') block
         self.builder.position_at_start(block=merge_bb)
         phi: ir.PhiInstr = self.builder.phi(typ=ir.DoubleType(), name="iftmp")
         phi.add_incoming(value=then_value, block=then_bb)
@@ -167,6 +167,12 @@ class LLVMCodeGenerator:
         return phi
 
     def _emit_ForExpr(self, node: kal_ast.ForExpr) -> ir.Value:
+        # Create basic blocks in the current function to express the control flow
+        loop_cond_bb = self.builder.function.append_basic_block("for.cond")
+        loop_body_bb = self.builder.function.append_basic_block("for.body")
+        loop_inc_bb = self.builder.function.append_basic_block("for.inc")
+        loop_end_bb = self.builder.function.append_basic_block("for.end")
+
         # Create an alloca for the induction variable in the entry block of the current function
         var_addr = self.__alloca(var_name=node.id_name)
 
@@ -174,28 +180,31 @@ class LLVMCodeGenerator:
         init_value = self._emit(node.init_expr)
         self.builder.store(value=init_value, ptr=var_addr)
 
-        # Make the new basic block for the loop header, inserting it after the current block
-        loop_body_bb = self.builder.function.append_basic_block("loopbody")
-
-        # Insert an explicit fall through from the current block to loop_body_bb, then start insertion into it
-        self.builder.branch(target=loop_body_bb)
-        self.builder.position_at_start(block=loop_body_bb)
+        # Insert an explicit fall through from the current block to loop_cond_bb, then start insertion into it
+        self.builder.branch(target=loop_cond_bb)
+        self.builder.position_at_start(block=loop_cond_bb)
 
         # Within the loop, the variable refers to the stack slot allocated with alloca
         # NOTE if it shadows an existing variable, we have to restore it, so we save it now
         old_var_addr = self.func_symtab.get(node.id_name)
         self.func_symtab[node.id_name] = var_addr
 
-        # Emit the body of the loop
-        # NOTE this, like any other expr, can change the current BB
-        _body_value = self._emit(node.body_expr)  # NOTE we ignore the computed value
-
         # Compute the end-loop condition and convert it
         cond_value = self.builder.fcmp_ordered(
             "!=", self._emit(node.cond_expr), FALSE, name="loopcond"
         )
 
+        # Insert a conditional branch based on the loop condition value
+        self.builder.cbranch(cond_value, truebr=loop_body_bb, falsebr=loop_end_bb)
+
+        # Emit the body of the loop
+        # NOTE this, like any other expr, can change the current BB
+        self.builder.position_at_start(block=loop_body_bb)
+        _body_value = self._emit(node.body_expr)  # NOTE we ignore the computed value
+
         # Emit the step value (if not specified, use 1.0)
+        self.builder.branch(target=loop_inc_bb)
+        self.builder.position_at_start(block=loop_inc_bb)
         step_value = ONE if node.step_expr is None else self._emit(node.step_expr)
 
         # Reload, increment, and restore the alloca
@@ -204,16 +213,11 @@ class LLVMCodeGenerator:
         next_var_value = self.builder.fadd(curr_var_value, step_value, name="nextloopvar")
         self.builder.store(value=next_var_value, ptr=var_addr)
 
-        # Create the "after loop" block ('endfor') and insert it
-        after_loop_bb = self.builder.function.append_basic_block("endfor")
+        # Create an unconditional branch to loop_cond_bb
+        self.builder.branch(target=loop_cond_bb)
 
-        # Insert a conditional branch in the end of the loop
-        self.builder.cbranch(
-            cond_value, truebr=loop_body_bb, falsebr=after_loop_bb,
-        )
-
-        # Any new code will be inserted in after_loop_bb
-        self.builder.position_at_start(block=after_loop_bb)
+        # Any new code will be inserted in loop_end_bb
+        self.builder.position_at_start(block=loop_end_bb)
 
         # Remove the loop variable from the symbol table
         if old_var_addr is None:
@@ -239,7 +243,7 @@ class LLVMCodeGenerator:
     def _emit_Prototype(self, node: kal_ast.Prototype) -> ir.Value:
         fn_name = node.name
         fn_type = ir.FunctionType(
-            return_type=ir.DoubleType(), args=[ir.DoubleType() for _ in range(len(node.params))],
+            return_type=ir.DoubleType(), args=[ir.DoubleType() for _ in range(len(node.params))]
         )
 
         if (fn := self.module.globals.get(fn_name)) is None:

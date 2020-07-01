@@ -140,7 +140,10 @@ def test_var_expr():
     )
     # NOTE Kaleidoscope's 'for' loop executes the last iteration even when the
     # condition is no longer fulfilled after the step is done: 0 + 2 + 4 + 6 + 8 + 10
-    assert e.eval_expr("foo(2)") == 30
+    # # assert e.eval_expr("foo(2)") == 30
+    # NOTE _emit_ForExpr() has been edited so that the loop condition is checked
+    # before body execution, and not after, so there is no extra run: 0 + 2 + 4 + 6 + 8
+    assert e.eval_expr("foo(2)") == 20
 
 
 def test_nested_var_exprs():

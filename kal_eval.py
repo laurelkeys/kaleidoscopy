@@ -17,7 +17,7 @@ from kal_parser import Parser
 
 
 EvalResult = namedtuple(
-    typename="EvalResult", field_names=["ast", "unoptimized_ir", "optimized_ir", "value"],
+    typename="EvalResult", field_names=["ast", "unoptimized_ir", "optimized_ir", "value"]
 )
 
 
@@ -143,9 +143,7 @@ class KaleidoscopeCodeEvaluator:
         llvmmod.verify()
 
         if llvmdump:
-            self.__dump(
-                llvmmod, into="__dump__unoptimized.ll", and_log="Unoptimized LLVM IR code",
-            )
+            self.__dump(llvmmod, into="__dump__unoptimized.ll", and_log="Unoptimized LLVM IR code")
 
         # Run module optimization passes
         if optimize:
@@ -158,9 +156,7 @@ class KaleidoscopeCodeEvaluator:
             # FIXME make sure all optimizations at InitializeModuleAndPassManager() are enabled
 
             if llvmdump:
-                self.__dump(
-                    llvmmod, into="__dump__optimized.ll", and_log="Optimized LLVM IR code",
-                )
+                self.__dump(llvmmod, into="__dump__optimized.ll", and_log="Optimized LLVM IR code")
 
             opt_ir = self.__last_ir(index=-2)
 
