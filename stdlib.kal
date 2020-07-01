@@ -2,7 +2,7 @@
 # ref.: https://github.com/frederickjeanguerin/pykaleidoscope
 
 def unary - (a)
-    0 - a;
+  0 - a;
 
 def binary > 10 (a b)
   b < a;

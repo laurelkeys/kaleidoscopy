@@ -5,46 +5,46 @@ from collections import namedtuple
 
 @unique
 class TokenType(Enum):
-    EOF = -1
+    EOF        = -1
 
     # commands
-    DEF = -2
-    EXTERN = -3
+    DEF        = -2
+    EXTERN     = -3
 
     # primary
     IDENTIFIER = -4
-    NUMBER = -5
+    NUMBER     = -5
 
     # control
-    IF = -6
-    THEN = -7
-    ELSE = -8
-    FOR = -9
-    IN = -10
+    IF         = -6
+    THEN       = -7
+    ELSE       = -8
+    FOR        = -9
+    IN         = -10
 
     # mutable variable definition
-    VAR = -11
+    VAR        = -11
 
     # operators
-    OPERATOR = -12  # unknown character
-    BINARY = -13
-    UNARY = -14
+    OPERATOR   = -12  # unknown character
+    BINARY     = -13
+    UNARY      = -14
 
 
 Token = namedtuple(typename="Token", field_names=["type", "value"])
 
 
 keywords: Dict[str, Token] = {
-    "def": Token(TokenType.DEF, value="def"),
+    "def":    Token(TokenType.DEF,    value="def"),
     "extern": Token(TokenType.EXTERN, value="extern"),
-    "if": Token(TokenType.IF, value="if"),
-    "then": Token(TokenType.THEN, value="then"),
-    "else": Token(TokenType.ELSE, value="else"),
-    "for": Token(TokenType.FOR, value="for"),
-    "in": Token(TokenType.IN, value="in"),
-    "var": Token(TokenType.VAR, value="var"),
+    "if":     Token(TokenType.IF,     value="if"),
+    "then":   Token(TokenType.THEN,   value="then"),
+    "else":   Token(TokenType.ELSE,   value="else"),
+    "for":    Token(TokenType.FOR,    value="for"),
+    "in":     Token(TokenType.IN,     value="in"),
+    "var":    Token(TokenType.VAR,    value="var"),
     "binary": Token(TokenType.BINARY, value="binary"),
-    "unary": Token(TokenType.UNARY, value="unary"),
+    "unary":  Token(TokenType.UNARY,  value="unary"),
 }
 assert all([kw_key == kw.value for kw_key, kw in keywords.items()])
 assert len(kw_types := [kw.type for kw in keywords.values()]) == len(set(kw_types))

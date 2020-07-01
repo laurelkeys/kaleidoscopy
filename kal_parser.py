@@ -1,11 +1,11 @@
 from typing import List, Tuple, Iterator, Optional
 
 import kal_ast
-import kal_ops
 import kal_lexer
+import kal_bin_ops
 
-from kal_ops import Associativity, operators, get_precedence, get_associativity
 from kal_lexer import Lexer, Token, TokenType
+from kal_bin_ops import Associativity, operators, get_precedence, get_associativity
 
 
 class ParseError(Exception):
@@ -293,7 +293,7 @@ class Parser:
         self.__eat_tok()  # LETTER
 
         # Read the precedence, if present
-        precedence = kal_ops.DEFAULT_PRECEDENCE
+        precedence = kal_bin_ops.DEFAULT_PRECEDENCE
         if self.curr_tok.type == TokenType.NUMBER:
             precedence = int(self.curr_tok.value)
             if not (1 <= precedence <= 100):
@@ -301,8 +301,8 @@ class Parser:
             self.__eat_tok()  # number
 
         # As this is a new binary operator, install it
-        operators[fn_name[-1]] = kal_ops.OperatorInfo(
-            kal_ops.Associativity.NON, precedence  # FIXME associativty
+        operators[fn_name[-1]] = kal_bin_ops.OperatorInfo(
+            kal_bin_ops.Associativity.NON, precedence  # FIXME associativty
         )
 
         params: List[str] = self.__parse_prototype_params()

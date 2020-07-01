@@ -3,7 +3,6 @@ from typing import Any, Dict
 import llvmlite.ir as ir
 
 import kal_ast
-import kal_ops
 
 
 class GenerateCodeError(Exception):
@@ -12,7 +11,7 @@ class GenerateCodeError(Exception):
 
 # NOTE Kaleidoscope uses double precision floating point for all values
 ZERO = FALSE = ir.Constant(ir.DoubleType(), 0.0)
-ONE = TRUE = ir.Constant(ir.DoubleType(), 1.0)
+ONE  = TRUE  = ir.Constant(ir.DoubleType(), 1.0)
 
 # NOTE fcmp_ordered means that neither operand can be a QNAN (quite NaN)
 # NOTE fcmp_unordered means that either operand may be a QNAN (quite NaN)

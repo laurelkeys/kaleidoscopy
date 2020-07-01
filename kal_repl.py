@@ -8,10 +8,10 @@ import colorama
 from termcolor import cprint, colored
 
 import kal_ir
-import kal_ops
 import kal_eval
 import kal_lexer
 import kal_parser
+import kal_bin_ops
 
 colorama.init()
 
@@ -92,7 +92,7 @@ def print_function_list(lst):
 
 def print_functions(k):
     # Operators
-    print(colored("\nBuilt-in operators:", color="blue"), *kal_ops.operators.keys())
+    print(colored("\nBuilt-in operators:", color="blue"), *kal_bin_ops.operators.keys())
 
     # User-defined/extern functions
     user_functions, extern_functions = [], []

@@ -8,3 +8,8 @@ import kal_ast
 import kal_eval
 import kal_lexer
 import kal_parser
+import kal_bin_ops
+
+del sys.path[0]
+del sys
+del os

@@ -4,8 +4,8 @@ from collections import namedtuple
 
 
 class Associativity(Enum):
-    NON = 0
-    LEFT = 1
+    NON   = 0
+    LEFT  = 1
     RIGHT = 2
 
 

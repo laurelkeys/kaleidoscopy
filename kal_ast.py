@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Tuple, Optional
 
-import kal_ops
+from kal_bin_ops import DEFAULT_PRECEDENCE
 
 
 class Node:
@@ -106,11 +106,7 @@ class Prototype(Node):
     """
 
     def __init__(
-        self,
-        name: str,
-        params: List[str],
-        is_operator=False,
-        bin_op_precedence=kal_ops.DEFAULT_PRECEDENCE,
+        self, name: str, params: List[str], is_operator=False, bin_op_precedence=DEFAULT_PRECEDENCE,
     ):
         self.name = name
         self.params = params

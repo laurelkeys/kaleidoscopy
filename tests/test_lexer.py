@@ -12,9 +12,7 @@ from kal_lexer import Lexer, Token, TokenType
 
 def _assert_toks(toks: List[Token], tok_type_names: List[str]):
     """ Assert that the list of toks has the given types. """
-    assert all(
-        [tok.type.name == tok_type_name for tok, tok_type_name in zip(toks, tok_type_names)]
-    )
+    assert all([tok.type.name == tok_type_name for tok, tok_type_name in zip(toks, tok_type_names)])
 
 
 def test_lexer_simple_tokens_and_values():
@@ -34,15 +32,7 @@ def test_token_types():
     l = Lexer("10.1 def der extern foo (")
     _assert_toks(
         toks=list(l.tokens()),
-        tok_type_names=[
-            "NUMBER",
-            "DEF",
-            "IDENTIFIER",
-            "EXTERN",
-            "IDENTIFIER",
-            "OPERATOR",
-            "EOF",
-        ],
+        tok_type_names=["NUMBER", "DEF", "IDENTIFIER", "EXTERN", "IDENTIFIER", "OPERATOR", "EOF",],
     )
 
     l = Lexer("+- 1 2 22 22.4 a b2 C3d")
