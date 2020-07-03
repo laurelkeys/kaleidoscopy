@@ -1,4 +1,7 @@
 # kaleidoscopy
+An implementation of the [LLVM Tutorial](http://llvm.org/docs/tutorial/MyFirstLanguageFrontend/index.html)'s "[Kaleidoscope](http://llvm.org/docs/tutorial/MyFirstLanguageFrontend/index.html)" toy language, using [Python 3.8.2](requirements.txt) and [llvmlite](https://github.com/numba/llvmlite).
+
+Based on both [frederickjeanguerin](https://github.com/frederickjeanguerin)'s [pykaleidoscope](https://github.com/frederickjeanguerin/pykaleidoscope) and [eliben](https://github.com/eliben)'s [pykaleidoscope](https://github.com/eliben/pykaleidoscope).
 
 ## Grammar
 ```
@@ -56,8 +59,3 @@ varexpr ::= 'var' identifier ('=' expression)?
                   (',' identifier ('=' expression)?)*
             'in' expression
 ```
-
-## References
-- ["Kaleidoscope" language](http://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl01.html), from the [LLVM Tutorial](http://llvm.org/docs/tutorial/MyFirstLanguageFrontend/index.html)
-- [frederickjeanguerin](https://github.com/frederickjeanguerin)'s [pykaleidoscope](https://github.com/frederickjeanguerin/pykaleidoscope)
-- [eliben](https://github.com/eliben)'s [pykaleidoscope](https://github.com/eliben/pykaleidoscope)

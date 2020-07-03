@@ -150,6 +150,11 @@ class KaleidoscopeCodeEvaluator:
             pmb = llvm.create_pass_manager_builder()
             pm = llvm.create_module_pass_manager()
 
+            # pm.add_instruction_combining_pass()
+            # pm.add_gvn_pass()
+            # pm.add_cfg_simplification_pass()
+            # pm.add_dead_code_elimination_pass()
+
             pmb.opt_level = 2
             pmb.populate(pm)
             pm.run(llvmmod)

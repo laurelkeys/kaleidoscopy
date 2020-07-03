@@ -13,6 +13,8 @@ import kal_lexer
 import kal_parser
 import kal_bin_ops
 
+from kal import KAL_STDLIB_PATH
+
 colorama.init()
 
 # ref.: https://github.com/frederickjeanguerin/pykaleidoscope
@@ -131,7 +133,7 @@ def run_repl_command(k, command, options):
         reload(kal_parser)
         k.reset()
         history = []
-        run_repl_command(k, "stdlib.kal", {})
+        run_repl_command(k, KAL_STDLIB_PATH, {})
     elif command:
         # Here the command should be a filename
         try:
@@ -161,7 +163,7 @@ def run(optimize=True, llvmdump=False, noexec=False, parseonly=False, verbose=Fa
 
     # Enter a REPL loop
     cprint("Type help or a command to be interpreted", color="green")
-    command = ".stdlib.kal"
+    command = f".{KAL_STDLIB_PATH}"
     while not command in ["exit", "quit"]:
         try:
             run_command(k, command, options)

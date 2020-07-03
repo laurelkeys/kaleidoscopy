@@ -1,3 +1,4 @@
+import os
 import sys
 import argparse
 
@@ -11,6 +12,10 @@ import kal_eval
 import kal_repl
 
 # ref.: https://github.com/frederickjeanguerin/pykaleidoscope
+
+
+KAL_STDLIB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "stdlib.kal"))
+KAL_STDLIB_EXTERN_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "stdlibextern.kal"))
 
 
 def run(**options):
@@ -46,10 +51,10 @@ if __name__ == "__main__":
     else:
         kal_code = ""
         if args.stdlib:
-            with open("stdlib.kal", "r") as stdlib_file:
+            with open(KAL_STDLIB_PATH, "r") as stdlib_file:
                 kal_code += stdlib_file.read()
         if args.stdlibextern:
-            with open("stdlibextern.kal", "r") as stdlibextern_file:
+            with open(KAL_STDLIB_EXTERN_PATH, "r") as stdlibextern_file:
                 kal_code += stdlibextern_file.read()
         try:
             with open(args.file, "r") as kal_file:

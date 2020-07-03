@@ -14,4 +14,5 @@ int main() {
  * $ .\test_object_code.exe
  * average of 3.0 and 4.0: 3.5
  *
+ * NOTE: to generate the .o file, uncomment and run the last test in test_ir.py
  */

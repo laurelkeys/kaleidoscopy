@@ -5,8 +5,8 @@ except:
 
 from typing import List, Optional
 
-from kal_ast import (Node, CallExpr, Function, Prototype, UnaryExpr, VarInExpr, BinaryExpr,
-                     NumberExpr, VariableExpr)
+from kal_ast import (NumberExpr, VariableExpr, BinaryExpr, UnaryExpr, VarInExpr, CallExpr,
+                     Node, Function, Prototype)
 from kal_parser import Parser
 from kal_bin_ops import DEFAULT_PRECEDENCE
 

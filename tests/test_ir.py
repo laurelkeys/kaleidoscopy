@@ -139,10 +139,11 @@ def test_var_expr():
                     accum = accum + i) : accum"""
     )
     # NOTE Kaleidoscope's 'for' loop executes the last iteration even when the
-    # condition is no longer fulfilled after the step is done: 0 + 2 + 4 + 6 + 8 + 10
-    # # assert e.eval_expr("foo(2)") == 30
-    # NOTE _emit_ForExpr() has been edited so that the loop condition is checked
-    # before body execution, and not after, so there is no extra run: 0 + 2 + 4 + 6 + 8
+    # condition is no longer fulfilled after the step is done, which would lead to: 0 + 2 + 4 + 6 + 8 + 10
+    # assert e.eval_expr("foo(2)") == 30
+
+    # NOTE however, this has been changed so that the loop condition is checked
+    # before body execution, and not after, so there is no extra run (as is usual): 0 + 2 + 4 + 6 + 8
     assert e.eval_expr("foo(2)") == 20
 
 
@@ -207,10 +208,8 @@ def test_compiling_to_object_code():
     elif obj[:4] == macho_magic:
         assert obj_format == "MachO"
     else:
-        # There are too many variations of COFF magic number,
-        # so we assume all other formats are COFF
         assert obj_format == "COFF"
 
-    # NOTE uncoment to output the generated code
+    # NOTE uncomment to output the generated code
     # with open(os.path.join(os.path.dirname(__file__), "average.o"), "wb") as average_obj_file:
     #     average_obj_file.write(obj)
