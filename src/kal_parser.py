@@ -1,7 +1,6 @@
 from typing import List, Tuple, Iterator, Optional
 
 import kal_ast
-import kal_lexer
 import kal_bin_ops
 
 from kal_lexer import Lexer, Token, TokenType

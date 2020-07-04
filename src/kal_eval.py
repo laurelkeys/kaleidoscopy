@@ -146,19 +146,14 @@ class KaleidoscopeCodeEvaluator:
             self.__dump(llvmmod, into="__dump__unoptimized.ll", and_log="Unoptimized LLVM IR code")
 
         # Run module optimization passes
+        # ref.: https://llvmlite.readthedocs.io/en/latest/user-guide/binding/optimization-passes.html
         if optimize:
             pmb = llvm.create_pass_manager_builder()
             pm = llvm.create_module_pass_manager()
 
-            # pm.add_instruction_combining_pass()
-            # pm.add_gvn_pass()
-            # pm.add_cfg_simplification_pass()
-            # pm.add_dead_code_elimination_pass()
-
             pmb.opt_level = 2
             pmb.populate(pm)
             pm.run(llvmmod)
-            # FIXME make sure all optimizations at InitializeModuleAndPassManager() are enabled
 
             if llvmdump:
                 self.__dump(llvmmod, into="__dump__optimized.ll", and_log="Optimized LLVM IR code")

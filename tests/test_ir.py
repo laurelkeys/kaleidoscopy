@@ -3,14 +3,7 @@ try:
 except:
     pass
 
-import os
-
-from typing import List, Optional
-
-from kal_ir import LLVMCodeGenerator
-from kal_ast import Node, CallExpr, Function, Prototype, BinaryExpr, NumberExpr, VariableExpr
 from kal_eval import KaleidoscopeCodeEvaluator
-from kal_parser import Parser
 
 # ref.: https://github.com/eliben/pykaleidoscope/
 

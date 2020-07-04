@@ -1,7 +1,7 @@
 # kaleidoscopy
-An implementation of the [LLVM Tutorial](http://llvm.org/docs/tutorial/MyFirstLanguageFrontend/index.html)'s "[Kaleidoscope](http://llvm.org/docs/tutorial/MyFirstLanguageFrontend/index.html)" toy language, using [Python 3.8.2](requirements.txt) and [llvmlite](https://github.com/numba/llvmlite).
+An implementation of the [LLVM Tutorial](http://llvm.org/docs/tutorial/MyFirstLanguageFrontend/index.html)'s "[Kaleidoscope](http://llvm.org/docs/tutorial/MyFirstLanguageFrontend/index.html)" toy language, using [Python 3.8](requirements.txt) and [llvmlite 0.32](https://github.com/numba/llvmlite).
 
-Based on both [frederickjeanguerin](https://github.com/frederickjeanguerin)'s [pykaleidoscope](https://github.com/frederickjeanguerin/pykaleidoscope) and [eliben](https://github.com/eliben)'s [pykaleidoscope](https://github.com/eliben/pykaleidoscope).
+Based on both [frederickjeanguerin](https://github.com/frederickjeanguerin/pykaleidoscope)'s and [eliben](https://github.com/eliben/pykaleidoscope)'s `pykaleidoscope`.
 
 ## Grammar
 ```
